@@ -1,0 +1,24 @@
+DEFINITION MODULE EditUser;
+
+        (************************************************************)
+        (*                                                          *)
+        (*                  PM Setup for FtpServer                  *)
+        (*          Dialogue to edit the data for one user          *)
+        (*                                                          *)
+        (*    Started:        25 October 1999                       *)
+        (*    Last edited:    2 November 1999                       *)
+        (*    Status:         OK                                    *)
+        (*                                                          *)
+        (************************************************************)
+
+
+FROM OS2 IMPORT HWND;
+
+PROCEDURE Edit (owner: HWND;  VAR (*INOUT*) name: ARRAY OF CHAR;
+                                                  clone: BOOLEAN): BOOLEAN;
+
+    (* Edit the properties of the user called "name".  Returns TRUE iff the     *)
+    (* user name has been changed.                                              *)
+
+END EditUser.
+

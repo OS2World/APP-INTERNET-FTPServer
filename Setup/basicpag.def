@@ -1,0 +1,31 @@
+DEFINITION MODULE BasicPage;
+
+        (****************************************************************)
+        (*                                                              *)
+        (*                    PM Setup for FtpServer                    *)
+        (*                    Page 1 of the notebook                    *)
+        (*                                                              *)
+        (*        Started:        8 October 1999                        *)
+        (*        Last edited:    16 April 2011                         *)
+        (*        Status:         OK                                    *)
+        (*                                                              *)
+        (****************************************************************)
+
+
+IMPORT OS2, CommonSettings;
+
+PROCEDURE CreatePage (notebook: OS2.HWND;  TNImode: BOOLEAN;
+                       VAR (*OUT*) PageID: CARDINAL): OS2.HWND;
+
+    (* Creates page 1 and adds it to the notebook. *)
+
+PROCEDURE StoreData (hwnd: OS2.HWND);
+
+    (* Stores the values on page 1 back into the INI file. *)
+
+PROCEDURE SetFont (VAR (*IN*) name: CommonSettings.FontName);
+
+    (* Sets the font of the text on this page. *)
+
+END BasicPage.
+

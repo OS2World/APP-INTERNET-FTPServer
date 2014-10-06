@@ -1,0 +1,50 @@
+DEFINITION MODULE FtpCl2;
+
+        (********************************************************)
+        (*                                                      *)
+        (* FtpServer administration - communication with server *)
+        (*                                                      *)
+        (*  Programmer:         P. Moylan                       *)
+        (*  Started:            28 October 1997                 *)
+        (*  Last edited:        22 June 1998                    *)
+        (*  Status:             OK                              *)
+        (*                                                      *)
+        (********************************************************)
+
+
+PROCEDURE EditAccessParameters;
+
+    (* Allows the user to specify user name, etc., for accessing the server. *)
+
+PROCEDURE GetHostAddresses(): CARDINAL;
+
+    (* Makes an internal record of all known IP addresses for the host.  *)
+    (* The return value is the number of addresses found.                *)
+
+PROCEDURE HostAddress (j: CARDINAL): CARDINAL;
+
+    (* Returns the j'th address found by GetHostAddresses. *)
+
+PROCEDURE ConnectToServer (address: CARDINAL): BOOLEAN;
+
+    (* Establishes a connection, returns TRUE iff successful. *)
+
+PROCEDURE Login(): BOOLEAN;
+
+    (* Attempts to log in, returns TRUE iff successful. *)
+
+PROCEDURE SendCommand (command: ARRAY OF CHAR): BOOLEAN;
+
+    (* Sends a command to the server.  The function result is FALSE if  *)
+    (* we've lost the connection.                                       *)
+
+PROCEDURE GetResponse (VAR (*OUT*) result: ARRAY OF CHAR;
+                                VAR (*OUT*) MoreToCome: BOOLEAN): BOOLEAN;
+
+    (* Returns one line of the server response to a command.            *)
+    (* MoreToCome is set if this is part of a multi-line response, and  *)
+    (* it's not the last line.  The function result is FALSE if we've   *)
+    (* lost the connection.                                             *)
+
+END FtpCl2.
+

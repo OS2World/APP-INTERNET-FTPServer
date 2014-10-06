@@ -1,0 +1,32 @@
+DEFINITION MODULE Security;
+
+        (****************************************************************)
+        (*                                                              *)
+        (*                   PM Setup for FtpServer                     *)
+        (*               Security page of the notebook                  *)
+        (*                                                              *)
+        (*        Started:        10 October 1999                       *)
+        (*        Last edited:    16 April 2011                         *)
+        (*        Status:         Just started                          *)
+        (*                                                              *)
+        (****************************************************************)
+
+
+IMPORT CommonSettings;
+
+FROM OS2 IMPORT HWND;
+
+PROCEDURE CreatePage (notebook: HWND;  VAR (*OUT*) PageID: CARDINAL): HWND;
+
+    (* Creates the security page and adds it to the notebook. *)
+
+PROCEDURE StoreData (hwnd: HWND);
+
+    (* Stores the security data back to the INI file. *)
+
+PROCEDURE SetFont (VAR (*IN*) name: CommonSettings.FontName);
+
+    (* Sets the font of the text on this page. *)
+
+END Security.
+

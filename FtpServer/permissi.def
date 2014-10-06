@@ -1,0 +1,69 @@
+DEFINITION MODULE PermissionEditor;
+
+        (********************************************************)
+        (*                                                      *)
+        (*         Editor for the user access rights            *)
+        (*                                                      *)
+        (*  Programmer:         P. Moylan                       *)
+        (*  Started:            2 December 1997                 *)
+        (*  Last edited:        1 September 1998                *)
+        (*  Status:             OK                              *)
+        (*                                                      *)
+        (********************************************************)
+
+FROM MultiScreen IMPORT VirtualScreen;
+FROM Windows IMPORT Window;
+
+(************************************************************************)
+
+TYPE
+    DirEntryPtr;       (* is private *)
+    CharArrayPointer = POINTER TO ARRAY [0..MAX(CARDINAL) DIV 4] OF CHAR;
+
+(************************************************************************)
+(*                             PARSING                                  *)
+(************************************************************************)
+
+PROCEDURE LoadTreeData (bufptr: CharArrayPointer; BufferSize: CARDINAL): DirEntryPtr;
+
+    (* Reads a representation of the directory tree from bufptr^, starting *)
+    (* at bufptr^[0], and constructs the permissions tree.                 *)
+
+(************************************************************************)
+(*                       DIRECTORY TREE MANIPULATION                    *)
+(************************************************************************)
+
+PROCEDURE CreateDefaultRoot(): DirEntryPtr;
+
+    (* Creates a node with default values for the root. *)
+
+PROCEDURE KillList (VAR (*INOUT*) p: DirEntryPtr);
+
+    (* Discards a directory tree.  *)
+
+PROCEDURE DirectorySummary (w: Window;  root: DirEntryPtr;  rows: CARDINAL);
+
+    (* Writes an overview of the tree to window w.  The third parameter *)
+    (* specifies how much space is available in the window.             *)
+
+PROCEDURE EditDirectoryData (root: DirEntryPtr;  Screen: VirtualScreen);
+
+    (* Allows the user to edit the directory tree. *)
+
+(************************************************************************)
+(*                          INI FILE OUTPUT                             *)
+(************************************************************************)
+
+PROCEDURE SizeOfDirectoryData (D: DirEntryPtr): CARDINAL;
+
+    (* Returns the number of characters needed to store the INI file    *)
+    (* data for this directory.                                         *)
+
+PROCEDURE StoreDirectoryData (D: DirEntryPtr;
+                                  VAR (*INOUT*) result: ARRAY OF CHAR);
+
+    (* Stores the information, for the directory tree whose root is D,  *)
+    (* into the result array starting at result[0].                     *)
+
+END PermissionEditor.
+

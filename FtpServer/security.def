@@ -1,0 +1,28 @@
+DEFINITION MODULE Security;
+
+        (********************************************************)
+        (*                                                      *)
+        (*           Part of FtpServer Setup program            *)
+        (*                                                      *)
+        (*  Programmer:         P. Moylan                       *)
+        (*  Started:            7 November 1998                 *)
+        (*  Last edited:        22 January 2014                 *)
+        (*  Status:             OK                              *)
+        (*                                                      *)
+        (********************************************************)
+
+
+PROCEDURE StartSecurityEditor(): BOOLEAN;
+
+    (* Initialisation of the Security page. *)
+
+PROCEDURE CardinalToDotted (value: CARDINAL;  VAR (*OUT*) text: ARRAY OF CHAR);
+
+    (* Converts the value to a string of the form a.b.c.d    *)
+
+PROCEDURE StringToIPAddress (text: ARRAY OF CHAR): CARDINAL;
+
+    (* Picks up an IP address. *)
+
+END Security.
+

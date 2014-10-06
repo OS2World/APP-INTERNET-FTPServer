@@ -1,0 +1,27 @@
+DEFINITION MODULE SetupINI;
+
+        (********************************************************)
+        (*                                                      *)
+        (*           Opens/closes FtpServer INI file            *)
+        (*                                                      *)
+        (*  Programmer:         P. Moylan                       *)
+        (*  Started:            1 February 1998                 *)
+        (*  Last edited:        7 November 2008                 *)
+        (*  Status:             OK                              *)
+        (*                                                      *)
+        (********************************************************)
+
+FROM INIData IMPORT
+    (* type *)  HINI;
+
+PROCEDURE OpenOurINIFile (UseTNI: BOOLEAN);
+
+    (* Opens the INI file. We are using a system of keeping the INI file open   *)
+    (* for the lifetime of the program.                                         *)
+
+PROCEDURE OurINIHandle(): HINI;
+
+    (* Returns the handle of the INI file, which is already open. *)
+
+END SetupINI.
+

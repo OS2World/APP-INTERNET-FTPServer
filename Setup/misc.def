@@ -1,0 +1,29 @@
+DEFINITION MODULE Misc;
+
+        (********************************************************)
+        (*                                                      *)
+        (*           Miscellaneous procedures for FSU           *)
+        (*                                                      *)
+        (*  Programmer:         P. Moylan                       *)
+        (*  Started:            7 October 1999                  *)
+        (*  Last edited:        21 May 2002                     *)
+        (*  Status:             OK                              *)
+        (*                                                      *)
+        (********************************************************)
+
+
+FROM OS2 IMPORT
+    (* type *)  HWND;
+
+
+PROCEDURE WinSetDlgItemCard (hwnd: HWND;  idItem, value: CARDINAL);
+
+    (* Sets a cardinal field in a dialogue. *)
+
+PROCEDURE WinQueryDlgItemCard (hwnd: HWND;  idItem: CARDINAL;
+                                 VAR (*OUT*) result: CARDINAL);
+
+    (* Reads back the value in a cardinal field in a dialogue. *)
+
+END Misc.
+

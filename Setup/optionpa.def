@@ -1,0 +1,30 @@
+DEFINITION MODULE OptionPage;
+
+        (****************************************************************)
+        (*                                                              *)
+        (*                    PM Setup for FtpServer                    *)
+        (*                    Page 2 of the notebook                    *)
+        (*                                                              *)
+        (*        Started:        10 October 1999                       *)
+        (*        Last edited:    16 April 2011                         *)
+        (*        Status:         OK                                    *)
+        (*                                                              *)
+        (****************************************************************)
+
+
+IMPORT OS2, CommonSettings;
+
+PROCEDURE CreatePage (notebook: OS2.HWND;  VAR (*OUT*) PageID: CARDINAL): OS2.HWND;
+
+    (* Creates the option page and adds it to the notebook. *)
+
+PROCEDURE StoreData (hwnd: OS2.HWND);
+
+    (* Stores the values on the option page back into the INI file. *)
+
+PROCEDURE SetFont (VAR (*IN*) name: CommonSettings.FontName);
+
+    (* Sets the font of the text on this page. *)
+
+END OptionPage.
+

@@ -1,0 +1,40 @@
+DEFINITION MODULE CommonSettings;
+
+        (****************************************************************)
+        (*                                                              *)
+        (*                  Setup program for FtpServer                 *)
+        (*             Data common to the main Setup notebook           *)
+        (*                                                              *)
+        (*    Started:        20 October 2003                           *)
+        (*    Last edited:    7 November 2008                           *)
+        (*    Status:         OK                                        *)
+        (*                                                              *)
+        (****************************************************************)
+
+
+FROM OS2 IMPORT WM_USER, HWND;
+
+CONST
+    FONTCHANGED = WM_USER + 1;
+    FontNameSize = 256;
+
+TYPE
+    FontName = ARRAY [0..FontNameSize-1] OF CHAR;
+
+PROCEDURE SetDefaultFont (TNImode: BOOLEAN);
+
+    (* Sets initial font if one isn't stored; also records whether to   *)
+    (* use a TNI file for the Setup data.                               *)
+
+PROCEDURE CurrentFont (VAR (*OUT*) fontname: FontName);
+
+    (* Returns the currently set font for this notebook. *)
+
+PROCEDURE UpdateFontFrom (hwnd: HWND);
+
+    (* Takes the font setting from window hwnd and propagates it to the *)
+    (* entire notebook.  Note that this will often be a "no operation"  *)
+    (* because the font is no different from the presently active one.  *)
+
+END CommonSettings.
+

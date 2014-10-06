@@ -1,0 +1,25 @@
+DEFINITION MODULE KillServer;
+
+        (****************************************************************)
+        (*                                                              *)
+        (*                    Monitor for FtpServer                     *)
+        (*                    "Kill server" dialogue                    *)
+        (*                                                              *)
+        (*    Started:        3 April 2000                              *)
+        (*    Last edited:    3 April 2000                              *)
+        (*    Status:         OK                                        *)
+        (*                                                              *)
+        (****************************************************************)
+
+FROM OS2 IMPORT
+    (* type *)  HWND;
+
+PROCEDURE RunDialogue (parent: HWND): CARDINAL;
+
+    (* Runs the "kill server" dialogue.  The result code is:    *)
+    (*     0    cancel                                          *)
+    (*     1    gradual shutdown                                *)
+    (*     2    quick shutdown                                  *)
+
+END KillServer.
+

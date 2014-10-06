@@ -1,0 +1,23 @@
+DEFINITION MODULE OpeningDialogue;
+
+        (****************************************************************)
+        (*                    PM Setup for FtpServer                    *)
+        (*                      Opening dialogue                        *)
+        (*                                                              *)
+        (*    Started:        7 October 1999                            *)
+        (*    Last edited:    13 November 2009                          *)
+        (*    Status:         OK                                        *)
+        (*                                                              *)
+        (****************************************************************)
+
+
+PROCEDURE CreateMainDialogue (LocalRemote: CARDINAL;  TNImode: BOOLEAN);
+
+    (* Creates the main dialogue box.  The meaning of LocalRemote is:    *)
+    (*         0   let user specify local or remote                      *)
+    (*         1   force local setup                                     *)
+    (*         2   force remote setup                                    *)
+    (*         3   force whichever was used last time                    *)
+
+END OpeningDialogue.
+

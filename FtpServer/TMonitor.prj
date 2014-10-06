@@ -1,0 +1,18 @@
+- GENDEBUG +
+- LINENO +
+- GENHISTORY +
+-multithread+
+
+-TRACKTNIUSAGE:-
+
+-INCL_VIO:+
+-INCL_KBD:+
+-INCL_DOS:+
+-INCL_DOSERRORS:+
+-INCL_MOU:+
+-INCL_WINSHELLDATA:+
+
+!module TMonitor
+!module SO32DLL.lib
+!module TCP32DLL.lib
+

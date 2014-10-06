@@ -1,0 +1,58 @@
+DEFINITION MODULE FtpdSession;
+
+        (********************************************************)
+        (*                                                      *)
+        (*       Part of the ftp server - handles a session     *)
+        (*                                                      *)
+        (*  Programmer:         P. Moylan                       *)
+        (*  Started:            21 August 1997                  *)
+        (*  Last edited:        22 December 2013                *)
+        (*  Status:             OK                              *)
+        (*                                                      *)
+        (********************************************************)
+
+
+FROM Sockets IMPORT
+    (* type *)  Socket, SockAddr;
+
+FROM TransLog IMPORT
+    (* type *)  TransactionLogID;
+
+
+PROCEDURE SetVersion (v: ARRAY OF CHAR);
+
+    (* Stores the version number. *)
+
+PROCEDURE DisableTelnetCompatibility (val: BOOLEAN);
+
+    (* Disables recognition of Telnet IAC character iff val is TRUE. *)
+
+PROCEDURE SetTransactionLogging (level: CARDINAL;
+                                 VAR (*IN*) logfile: ARRAY OF CHAR;
+                                 VAR (*IN*) SyslogHost: ARRAY OF CHAR);
+
+    (* Option to control transaction logging: 0 for none, 1 for disk,   *)
+    (* 2 for screen, 4 for pipe, 8 for translog, and combinations.      *)
+
+PROCEDURE SetMaxUsers (limit: CARDINAL);
+
+    (* Sets an upper limit on the number of simultaneous users. *)
+
+PROCEDURE SetTimeout (seconds: CARDINAL);
+
+    (* Specifies how long a session can be idle before it is forcibly   *)
+    (* closed.                                                          *)
+
+PROCEDURE NumberOfUsers(): CARDINAL;
+
+    (* Returns the number of users who are currently logged on. *)
+
+PROCEDURE NewSession (S: Socket;  addr: SockAddr;
+                         LogID: TransactionLogID): BOOLEAN;
+
+    (* Starts and runs a client session.  The session runs in a separate        *)
+    (* thread; this procedure returns after starting the session, it does not   *)
+    (* wait until the session is over.                                          *)
+
+END FtpdSession.
+

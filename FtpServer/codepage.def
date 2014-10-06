@@ -1,0 +1,43 @@
+DEFINITION MODULE CodePage;
+
+        (********************************************************)
+        (*                                                      *)
+        (*     Translation between code pages and Unicode       *)
+        (*                                                      *)
+        (*  Programmer:         P. Moylan                       *)
+        (*  Last edited:        10 March 2013                   *)
+        (*  Status:             OK                              *)
+        (*                                                      *)
+        (********************************************************)
+
+
+PROCEDURE TranslateToUTF8 (string: ARRAY OF CHAR;
+                           VAR (*OUT*) result: ARRAY OF CHAR);
+
+    (* Translates string, in the encoding used by the current code page, to a   *)
+    (* UTF-8 representation of the same string.                                 *)
+
+PROCEDURE TranslateFromUTF8 (string: ARRAY OF CHAR;
+                             VAR (*OUT*) result: ARRAY OF CHAR);
+
+    (* Translates string from UTF-8 to the extended ASCII code for the current  *)
+    (* code page.  If string is not valid UTF-8, result is an unmodified copy   *)
+    (* of string.  If it is valid UTF-8 but contains characters that cannot     *)
+    (* be represented in the current code page, we translate each such          *)
+    (* code to its low-order byte.  (This is probably as good as any other      *)
+    (* arbitrary decision.)                                                     *)
+
+PROCEDURE ChangeCurrentCodePage (P: CARDINAL);
+
+    (* Change the current process's code page to page P.  It is almost never    *)
+    (* necessary to call this procedure, because most programs will want to     *)
+    (* keep the code page they were started with.                               *)
+
+    (* Warning: this will affect every thread in this process, including those  *)
+    (* that are relying on previously scanned directory listings.  That can     *)
+    (* lead to files becoming misplaced because their names have changed.  In   *)
+    (* general it is unwise to call this procedure at any point other than      *)
+    (* program initialisation.                                                  *)
+
+END CodePage.
+

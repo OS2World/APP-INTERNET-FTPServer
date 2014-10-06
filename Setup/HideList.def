@@ -1,0 +1,41 @@
+DEFINITION MODULE HideList;
+
+        (****************************************************************)
+        (*                                                              *)
+        (*                   PM Setup for FtpServer                     *)
+        (*          Dialogue to edit the HideList for one user          *)
+        (*                                                              *)
+        (*        Started:        27 May 2013                           *)
+        (*        Last edited:    27 May 2013                           *)
+        (*        Status:         OK                                    *)
+        (*                                                              *)
+        (****************************************************************)
+
+
+FROM OS2     IMPORT HWND;
+FROM FileOps IMPORT FilenameString;
+
+
+TYPE
+    ListPtr = POINTER TO ListRecord;
+    ListRecord = RECORD
+                     previous, next: ListPtr;
+                     mask: FilenameString;
+                 END (*RECORD*);
+
+
+PROCEDURE LoadList (VAR (*IN*) username: ARRAY OF CHAR): ListPtr;
+
+    (* Loads a HideList from the INI or TNI file. *)
+
+PROCEDURE Edit (owner: HWND;  VAR (*INOUT*) L: ListPtr);
+
+    (* Edit list L.  *)
+
+PROCEDURE StoreList (VAR (*IN*) username: ARRAY OF CHAR;  head: ListPtr);
+
+    (* Stores a HideList to the INI file.  We assume that the   *)
+    (* caller already has the INI file open.                    *)
+
+END HideList.
+

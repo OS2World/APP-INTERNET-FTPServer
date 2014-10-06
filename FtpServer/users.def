@@ -1,0 +1,37 @@
+DEFINITION MODULE Users;
+
+        (********************************************************)
+        (*                                                      *)
+        (*                User data editor                      *)
+        (*                                                      *)
+        (*  Programmer:         P. Moylan                       *)
+        (*  Started:            2 December 1997                 *)
+        (*  Last edited:        25 July 2008                    *)
+        (*  Status:             Working                         *)
+        (*                                                      *)
+        (********************************************************)
+
+FROM MultiScreen IMPORT
+    (* type *)  VirtualScreen;
+
+FROM INIData IMPORT
+    (* type *)  HINI;
+
+(************************************************************************)
+
+PROCEDURE UserInINIFile (VAR (*OUT*) hini: HINI;
+                                username: ARRAY OF CHAR): BOOLEAN;
+
+    (* If username is in FTPD.INI, initialises hini and returns TRUE. *)
+
+PROCEDURE EditUser (Screen: VirtualScreen;  VAR (*INOUT*) name: ARRAY OF CHAR;
+                                                                clone: BOOLEAN);
+
+    (* Editor for the user permission data. *)
+
+PROCEDURE RemoveUser (name: ARRAY OF CHAR);
+
+    (* Deletes this user's permission file. *)
+
+END Users.
+

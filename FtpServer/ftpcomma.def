@@ -1,0 +1,77 @@
+DEFINITION MODULE FtpCommands;
+
+        (********************************************************)
+        (*                                                      *)
+        (*       Command interpreter for ftp server             *)
+        (*                                                      *)
+        (*  Programmer:         P. Moylan                       *)
+        (*  Started:            23 August 1997                  *)
+        (*  Last edited:        27 March 2014                   *)
+        (*  Status:             OK                              *)
+        (*                                                      *)
+        (********************************************************)
+
+
+FROM Sockets IMPORT
+    (* type *)  Socket;
+
+FROM TransLog IMPORT
+    (* type *)  LogContext, TransactionLogID;
+
+FROM Semaphores IMPORT
+    (* type *)  Semaphore;
+
+(********************************************************************************)
+
+TYPE Session;            (* is private *)
+
+VAR FTPDctx: LogContext;
+
+(********************************************************************************)
+
+PROCEDURE SetTransactionLogLevel (level: CARDINAL;
+                                  VAR (*IN*) filename: ARRAY OF CHAR;
+                                  VAR (*IN*) SyslogHost: ARRAY OF CHAR);
+
+    (* Option to control transaction logging: 0 for none, 1 for disk,   *)
+    (* 2 for screen, 4 for pipe, 8 for syslog, and combinations.        *)
+
+PROCEDURE HidePasswordsInLog (hide: BOOLEAN);
+
+    (* If hide is TRUE, we log the PASS command as PASS ******.  *)
+
+PROCEDURE SetExtraLogging (level: CARDINAL);
+
+    (* Option to control how detailed the transaction logging is: 0 for normal, *)
+    (* higher values for more detail, but the actual significance of the        *)
+    (* level could vary from time to time, because this option is intended      *)
+    (* for debugging.                                                           *)
+
+PROCEDURE EnableLogSiteMngr (enable: BOOLEAN);
+
+    (* Enables or disables the logging of SITE MNGR commands. *)
+
+PROCEDURE OpenSession (CommandSocket: Socket;  UserNumber, IPaddr: CARDINAL;
+                         LogID: TransactionLogID;  KeepAlive: Semaphore): Session;
+
+    (* Creates a new session state record.  During lengthy operations           *)
+    (* we have to do a Signal(KeepAlive) every so often in order to stop the    *)
+    (* session from timing out.                                                 *)
+
+PROCEDURE CloseSession (VAR (*INOUT*) S: Session);
+
+    (* Destroys the session state record. *)
+
+PROCEDURE KillDataChannel (S: Session);
+
+    (* Aborts the data transfer, if any, now in progress for this session. *)
+
+PROCEDURE HandleCommand (S: Session;  Command: ARRAY OF CHAR;
+                                           VAR (*OUT*) Quit, EndSession: BOOLEAN);
+
+    (* Executes one user command.  Returns with Quit = TRUE if this was a QUIT  *)
+    (* command.  Returns with EndSession = TRUE if the command is one that      *)
+    (* closes the session (this includes QUIT), or if the connection is lost.   *)
+
+END FtpCommands.
+

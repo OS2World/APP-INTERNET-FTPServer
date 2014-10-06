@@ -1,0 +1,17 @@
+DEFINITION MODULE FV;
+
+        (****************************************************************)
+        (*                                                              *)
+        (*                 FtpServer version number                     *)
+        (*                                                              *)
+        (*    Started:        8 November 2008                           *)
+        (*    Last edited:    7 September 2014                          *)
+        (*    Status:         OK                                        *)
+        (*                                                              *)
+        (****************************************************************)
+
+
+CONST
+    version = "2.1";
+END FV.
+

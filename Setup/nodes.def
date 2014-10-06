@@ -1,0 +1,56 @@
+DEFINITION MODULE Nodes;
+
+        (************************************************************)
+        (*                                                          *)
+        (*                  PM Setup for FtpServer                  *)
+        (*       Dialogue to edit the data for one tree node        *)
+        (*                                                          *)
+        (*    Started:        26 November 1999                      *)
+        (*    Last edited:    10 December 1999                      *)
+        (*    Status:         OK                                    *)
+        (*                                                          *)
+        (************************************************************)
+
+
+FROM OS2 IMPORT HWND;
+
+TYPE
+    NodePtr;      (* is private *)
+
+(****************************************************************************)
+
+PROCEDURE CreateNode (NodeName: ARRAY OF CHAR;  parent: NodePtr): NodePtr;
+
+    (* Creates a new node, making it virtual iff parent = NIL. *)
+
+PROCEDURE DiscardNode (VAR (*INOUT*) pnode: NodePtr);
+
+    (* Destroys the node. *)
+
+PROCEDURE NameOf (pnode: NodePtr;  VAR (*OUT*) name: ARRAY OF CHAR);
+
+    (* Returns the name of the node. *)
+
+PROCEDURE IsVirtual (pnode: NodePtr): BOOLEAN;
+
+    (* Returns TRUE iff this is a pseudo-directory or link. *)
+
+PROCEDURE QueryPhysicalPath (pnode: NodePtr;  VAR (*OUT*) path: ARRAY OF CHAR);
+
+    (* Returns the physical path of this node. *)
+
+PROCEDURE DetachFromParent (pnode: NodePtr);
+
+    (* Sets the parent of this node to NIL, leaves all other properties *)
+    (* unchanged.                                                       *)
+
+PROCEDURE MakeVirtual (pnode: NodePtr;  path: ARRAY OF CHAR);
+
+    (* Makes this node virtual, and sets its physical path. *)
+
+PROCEDURE Edit (owner: HWND;  VAR (*INOUT*) node: NodePtr);
+
+    (* Edit the properties of a single tree node.  *)
+
+END Nodes.
+

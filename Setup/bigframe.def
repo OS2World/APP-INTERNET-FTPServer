@@ -1,0 +1,21 @@
+DEFINITION MODULE BigFrame;
+
+        (****************************************************************)
+        (*                                                              *)
+        (*                    PM Setup for FtpServer                    *)
+        (*                                                              *)
+        (*        Started:        8 October 1999                        *)
+        (*        Last edited:    7 November 2008                       *)
+        (*        Status:         OK                                    *)
+        (*                                                              *)
+        (****************************************************************)
+
+
+IMPORT OS2;
+
+PROCEDURE OpenBigFrame (owner: OS2.HWND;  TNImode: BOOLEAN);
+
+    (* Creates the main dialogue box. *)
+
+END BigFrame.
+

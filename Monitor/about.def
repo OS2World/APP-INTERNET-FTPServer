@@ -1,0 +1,22 @@
+DEFINITION MODULE About;
+
+        (****************************************************************)
+        (*                                                              *)
+        (*                Admin program for MajorMajor                  *)
+        (*                     The 'about' dialogue                     *)
+        (*                                                              *)
+        (*    Started:        21 June 2000                              *)
+        (*    Last edited:    21 June 2000                              *)
+        (*    Status:         Just started                              *)
+        (*                                                              *)
+        (****************************************************************)
+
+
+FROM OS2 IMPORT HWND;
+
+PROCEDURE Create (owner: HWND);
+
+    (* Creates the dialogue box. *)
+
+END About.
+

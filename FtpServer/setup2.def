@@ -1,0 +1,19 @@
+DEFINITION MODULE Setup2;
+
+        (********************************************************)
+        (*                                                      *)
+        (*       A second page of FtpServer setup options       *)
+        (*                                                      *)
+        (*  Programmer:         P. Moylan                       *)
+        (*  Started:            18 January 1999                 *)
+        (*  Last edited:        22 January 2014                 *)
+        (*  Status:             OK                              *)
+        (*                                                      *)
+        (********************************************************)
+
+PROCEDURE StartPage2Editor(): BOOLEAN;
+
+    (* Initialisation for page 2 of VIOSetup. *)
+
+END Setup2.
+

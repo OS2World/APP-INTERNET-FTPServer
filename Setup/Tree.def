@@ -1,0 +1,44 @@
+DEFINITION MODULE Tree;
+
+        (************************************************************)
+        (*                                                          *)
+        (*                  PM Setup for FtpServer                  *)
+        (*          Dialogue to edit a file permission tree         *)
+        (*                                                          *)
+        (*    Started:        4 November 1999                       *)
+        (*    Last edited:    29 November 1999                      *)
+        (*    Status:         Still making major changes            *)
+        (*                                                          *)
+        (************************************************************)
+
+
+FROM OS2 IMPORT HWND;
+
+TYPE DirEntryPtr;           (* is private *)
+
+PROCEDURE LoadPermissions (username: ARRAY OF CHAR): DirEntryPtr;
+
+    (* Loads the permission tree from the INI file.  We assume that     *)
+    (* the caller has already opened the INI file.                      *)
+
+PROCEDURE InitialDisplay (hwnd: HWND;  root: DirEntryPtr);
+
+    (* Displays the tree whose root is given in a listbox window. *)
+
+PROCEDURE Edit (owner: HWND;  VAR (*INOUT*) name: ARRAY OF CHAR;
+                                  root: DirEntryPtr);
+
+    (* Edit the permission tree of the user called "name".   *)
+
+PROCEDURE SavePermissions (username: ARRAY OF CHAR;  root: DirEntryPtr);
+
+    (* Writes the tree back to the INI file.  We assume that the caller *)
+    (* has already opened the INI file.                                 *)
+
+PROCEDURE DeleteTree (VAR (*INOUT*) p: DirEntryPtr);
+
+    (* Removes an entire tree, including cleaning up the containing tree if     *)
+    (* this happens to be a subtree of another tree.                            *)
+
+END Tree.
+

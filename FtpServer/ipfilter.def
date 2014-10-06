@@ -1,0 +1,32 @@
+DEFINITION MODULE IPFilter;
+
+        (********************************************************)
+        (*                                                      *)
+        (*   Checks whether a client IP address is acceptable.  *)
+        (*                                                      *)
+        (*  Programmer:         P. Moylan                       *)
+        (*  Started:            5 September 2008                *)
+        (*  Last edited:        5 September 2008                *)
+        (*  Status:             OK                              *)
+        (*                                                      *)
+        (********************************************************)
+
+
+FROM INIData IMPORT
+    (* type *)  HINI;
+
+PROCEDURE CheckMasterIPFilter (IPAddress: CARDINAL): BOOLEAN;
+
+    (* Scan the master HostFilter to see whether this is an acceptable client. *)
+
+PROCEDURE CheckUserIPFilter (hini: HINI;  user: ARRAY OF CHAR;
+                                IPAddress: CARDINAL): BOOLEAN;
+
+    (* Scan the filter for "user" to see whether this is an acceptable client. *)
+
+PROCEDURE UpdateMasterHostFilter (hini: HINI);
+
+    (* Constructs the master host filter list from the INI file data.  *)
+
+END IPFilter.
+

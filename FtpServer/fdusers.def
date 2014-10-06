@@ -1,0 +1,235 @@
+DEFINITION MODULE FDUsers;
+
+        (********************************************************)
+        (*                                                      *)
+        (*      This is the module that knows what the user     *)
+        (*                 is allowed to do                     *)
+        (*                                                      *)
+        (*  Programmer:         P. Moylan                       *)
+        (*  Started:            30 August 1997                  *)
+        (*  Last edited:        25 May 2014                     *)
+        (*  Status:             Working                         *)
+        (*                                                      *)
+        (********************************************************)
+
+
+FROM Types IMPORT CARD64;
+FROM FileOps IMPORT ChanId;
+FROM Sockets IMPORT Socket;
+
+TYPE
+    User;          (* is private *)
+    FName;         (* is private *)
+    UserCategory = (NoSuchUser, NoPasswordNeeded, GuestUser,
+                    NormalUser, Manager, UserTemplate, OverflowUser);
+
+
+PROCEDURE ReadUserData (name: ARRAY OF CHAR;
+                          VAR (*OUT*) SpeedLimit: CARDINAL;
+                          VAR (*OUT*) UpSpeedLimit: CARDINAL;
+                          VAR (*OUT*) UpSizeLimit: CARD64;
+                          VAR (*OUT*) category: UserCategory;
+                          VAR (*OUT*) LogSession: BOOLEAN): User;
+
+    (* Fetches the password, etc., for the user whose username is specified     *)
+    (* as the argument.  Returns with category = NoSuchUser if the user's data  *)
+    (* could not be found or if this is a user category that does not permit    *)
+    (* logging in.  The result is NIL in this case, and also in the             *)
+    (* case of an overflow user.                                                *)
+
+PROCEDURE PasswordAcceptable (U: User;  VAR (*IN*) pass: ARRAY OF CHAR): BOOLEAN;
+
+    (* Tests for a password match. *)
+
+PROCEDURE DestroyUserData (VAR (*INOUT*) U: User);
+
+    (* Discards the data structure.  *)
+
+PROCEDURE NoteLoginTime (U: User);
+
+    (* Puts the current date/time as the "last login time" for this user.       *)
+
+PROCEDURE GetUserNumber (U: User;  VAR (*OUT*) UserNumber, Limit: CARDINAL);
+
+    (* Returns the user number and user limit, within the category defined by   *)
+    (* this user's username.                                                    *)
+
+PROCEDURE MakeFName (U: User;  filename: ARRAY OF CHAR): FName;
+
+    (* Creates an FName descriptor from the filename.  The result is NIL for    *)
+    (* a name that implies a nonexistent directory.                             *)
+
+PROCEDURE DiscardFName (VAR (*INOUT*) name: FName);
+
+    (* Disposes of the storage used by name. *)
+
+PROCEDURE SameDrive (name1, name2: FName): BOOLEAN;
+
+    (* Checks whether two file names are in the same physical drive. *)
+
+PROCEDURE SameParent (name1, name2: FName): BOOLEAN;
+
+    (* Checks whether two file names are in the same directory, as seen by the  *)
+    (* user.                                                                    *)
+
+PROCEDURE SpaceAvailable (name: FName): CARDINAL;
+
+    (* Returns the free space, in kilobytes, on the drive that would be used    *)
+    (* to store this file if we accepted it.                                    *)
+
+PROCEDURE PermissionString (U: User;  VAR (*OUT*) result: ARRAY OF CHAR);
+
+    (* Returns a string indicating read/write/delete permissions for the        *)
+    (* user's current directory.                                                *)
+
+PROCEDURE MakeFullName (Name: FName;  VAR (*OUT*) FullName: ARRAY OF CHAR);
+
+    (* Converts an FName to a full file name.  *)
+
+PROCEDURE MakeShortName (Name: FName;  VAR (*OUT*) ShortName: ARRAY OF CHAR);
+
+    (* Converts an FName to a file name relative to its own directory.  *)
+
+PROCEDURE NameOfCurrentDirectory (U: User;  VAR (*OUT*) DirString: ARRAY OF CHAR);
+
+    (* Gives back the name of the current directory for this user.  *)
+
+PROCEDURE RealNameOfCurrentDirectory (U: User;  VAR (*OUT*) DirString: ARRAY OF CHAR);
+
+    (* Gives back the name of the current directory for this user.  Note that   *)
+    (* the present procedure returns the directory name in the host file system *)
+    (* while NameOfCurrentDirectory returns a virtual directory name.           *)
+
+PROCEDURE FileOrDirExists (name: FName;  ShowHidden: BOOLEAN): BOOLEAN;
+
+    (* Returns TRUE iff the file or directory exists.  System and hidden files  *)
+    (* will appear to be nonexistent unless ShowHidden is TRUE.                 *)
+
+PROCEDURE IsAFile (name: FName;  ShowHidden: BOOLEAN): BOOLEAN;
+
+    (* Returns TRUE iff this is a file (not a directory) that exists.  System   *)
+    (* and hidden files will appear to be nonexistent unless ShowHidden is TRUE.*)
+
+PROCEDURE IsADirectory (name: FName;  ShowHidden: BOOLEAN): BOOLEAN;
+
+    (* Returns TRUE iff this is a directory that exists.  System and hidden     *)
+    (* files will appear to be nonexistent unless ShowHidden is TRUE.           *)
+
+PROCEDURE MayListFiles (iname: FName): BOOLEAN;
+
+    (* Returns TRUE iff the user has permission to see a directory listing of   *)
+    (* the file(s) implied by iname.                                            *)
+
+PROCEDURE CanSeeFileOrDir (U: User;  Name: FName;  Manager: BOOLEAN): BOOLEAN;
+
+    (* Returns TRUE iff the file or directory exists and is visible to this user.*)
+
+PROCEDURE CanReadFile (U: User;  Name: FName;  Manager: BOOLEAN): BOOLEAN;
+
+    (* Returns TRUE iff this is a file (not a directory) that exists and is     *)
+    (* readable by this user.                                                   *)
+
+PROCEDURE CanWriteFile (U: User;  Name: FName;  Manager, CheckExists: BOOLEAN): BOOLEAN;
+
+    (* Returns TRUE iff we can create a file of this name.  If CheckExists is   *)
+    (* TRUE and the file already exists, we must also have delete permission    *)
+    (* for it.                                                                  *)
+
+PROCEDURE RenameIsLegal (U: User;  Name: FName;  Manager: BOOLEAN): BOOLEAN;
+
+    (* Returns TRUE iff we may rename this file or directory.  *)
+
+PROCEDURE CanDeleteFile (U: User;  Name: FName;  Manager: BOOLEAN): BOOLEAN;
+
+    (* Returns TRUE iff we can delete a file of this name.  *)
+
+PROCEDURE CanDeleteDirectory (U: User;  Name: FName): BOOLEAN;
+
+    (* Returns TRUE iff user can delete this directory.  *)
+
+PROCEDURE CanCreateDirectory (U: User;  Name: FName): BOOLEAN;
+
+    (* Returns TRUE iff user can create a directory with this name.  *)
+
+TYPE
+    ListingOption = (ShowDetails, SystemAndHidden, ListDotDot, AddSlash,
+                     MayExpand, Recurse);
+
+    ListingOptions = SET OF ListingOption;
+
+    (* The options are:                                                         *)
+    (*   ShowDetails      Include flags, size, date, etc.                       *)
+    (*   SystemAndHidden  Include system and hidden files.                      *)
+    (*   ListDotDot       Include the '..' entry.                               *)
+    (*   AddSlash         Add a '/' to directory names.                         *)
+    (*   MayExpand        If the filename is a directory name, an implicit      *)
+    (*                      '*' is appended.                                    *)
+    (*   Recurse          Recurse over subdirectories.                          *)
+
+PROCEDURE ListDirectory (S: Socket;  U: User;  VAR (*INOUT*) arg: FName;
+                                       options: ListingOptions);
+
+    (* Sends a directory listing, as specified by arg and options.  On return   *)
+    (* arg has been disposed of.  Parameter arg uses the native character set,  *)
+    (* but the file names sent to socket S are in UTF-8 encoding.               *)
+
+PROCEDURE CreateDirectory (Name: FName): BOOLEAN;
+
+    (* Creates a new directory. *)
+
+PROCEDURE GetFileSize (Name: FName;  trusted: BOOLEAN): CARD64;
+
+    (* Returns the size in bytes of file "Name".  If the file is not    *)
+    (* accessible, the result is returned as MAX(CARD64).  Exception:   *)
+    (* if trusted=TRUE then we return the correct size even if it's an  *)
+    (* invisible file.                                                  *)
+
+PROCEDURE SetDateTime (iname: FName;  datetime: ARRAY OF CARDINAL);
+
+    (* Sets the modified/accessed/created timestamps for the file,      *)
+    (* from an array of 6 numbers already encoded into the format the   *)
+    (* filesystem uses for timestamps.                                  *)
+
+PROCEDURE GetDateTime (iname: FName;  VAR (*OUT*) result: ARRAY OF CHAR);
+
+    (* Returns the date/time of the file's directory entry, in a string of the  *)
+    (* form "yyyymmddhhmmss" (exactly 14 characters).  If the file is not       *)
+    (* accessible, the result is the null string.                               *)
+
+PROCEDURE OpenForReading (VAR (*OUT*) cid: ChanId;  name: FName): BOOLEAN;
+
+    (* Opens the file, returns TRUE iff successful. *)
+
+PROCEDURE OpenForWriting (VAR (*OUT*) cid: ChanId;  name: FName): BOOLEAN;
+
+    (* Opens the file - which might or might not already exist - and returns    *)
+    (* TRUE iff successful.                                                     *)
+
+PROCEDURE OpenForAppend (VAR (*OUT*) cid: ChanId;  name: FName): BOOLEAN;
+
+    (* Opens the file, returns TRUE iff successful. *)
+
+PROCEDURE RemoveFile (name: FName): BOOLEAN;
+
+    (* Deletes the file, returns TRUE iff successful. *)
+
+PROCEDURE RemoveDirectory (Name: FName): BOOLEAN;
+
+    (* Deletes a directory. *)
+
+PROCEDURE Rename (OldName, NewName: FName): BOOLEAN;
+
+    (* Renames OldName to NewName.  Returns TRUE for success.  *)
+
+PROCEDURE SetWorkingDirectory (U: User;  newdir: FName): BOOLEAN;
+
+    (* Changes user to the specified directory.  Returns FALSE if the requested    *)
+    (* directory does not exist, or if the user does not have the right to see it. *)
+
+PROCEDURE HaveSeenMessage (U: User): BOOLEAN;
+
+    (* Returns a flag that says whether this is the first call of this          *)
+    (* procedure for this user and this user's current directory.               *)
+
+END FDUsers.
+

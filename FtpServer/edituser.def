@@ -1,0 +1,20 @@
+DEFINITION MODULE EditUsers;
+
+        (********************************************************)
+        (*                                                      *)
+        (*             FtpServer user editor                    *)
+        (*                                                      *)
+        (*  Programmer:         P. Moylan                       *)
+        (*  Started:            22 January 1998                 *)
+        (*  Last edited:        22 January 2014                 *)
+        (*  Status:             OK                              *)
+        (*                                                      *)
+        (********************************************************)
+
+
+PROCEDURE StartUserEditor(): BOOLEAN;
+
+    (* Initialisation of the Edit Users page. *)
+
+END EditUsers.
+

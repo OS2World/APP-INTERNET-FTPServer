@@ -1,0 +1,66 @@
+DEFINITION MODULE FtpCl2;
+
+        (********************************************************)
+        (*                                                      *)
+        (*        Ftp monitor - communication with server       *)
+        (*                                                      *)
+        (*  Programmer:         P. Moylan                       *)
+        (*  Started:            29 March 2000                   *)
+        (*  Last edited:        14 October 2000                 *)
+        (*  Status:             Working                         *)
+        (*                                                      *)
+        (********************************************************)
+
+FROM OS2 IMPORT
+    (* type *)  HWND;
+
+PROCEDURE SetMessageWindow (w: HWND);
+
+    (* Window for debugging messages. *)
+
+PROCEDURE LoadINIData(): BOOLEAN;
+
+    (* Loads setup parameters from the INI file, returns the value      *)
+    (* of the "always on top" option.                                   *)
+
+PROCEDURE SetupDialogue (owner: HWND): BOOLEAN;
+
+    (* Runs the setup dialogue for remote host, etc.  Returns the       *)
+    (* state of the "always on top" checkbox.                           *)
+
+PROCEDURE SamplingInterval(): CARDINAL;
+
+    (* Returns the sampling interval, in seconds. *)
+
+PROCEDURE GetHostAddresses(): CARDINAL;
+
+    (* Loads the ServerAddr array with all known IP addresses for the host.     *)
+    (* The return value is the number of addresses found.                       *)
+
+PROCEDURE HostAddress (j: CARDINAL): CARDINAL;
+
+    (* Returns the j'th address found by GetHostAddresses. *)
+
+PROCEDURE ConnectToServer (address: CARDINAL): BOOLEAN;
+
+    (* Establishes a connection, returns TRUE iff successful. *)
+
+PROCEDURE Login(): BOOLEAN;
+
+    (* Attempts to log in, returns TRUE iff successful. *)
+
+PROCEDURE SendCommand (command: ARRAY OF CHAR): BOOLEAN;
+
+    (* Sends a command to the server.  The function result is FALSE if  *)
+    (* we've lost the connection.                                       *)
+
+PROCEDURE GetResponse (VAR (*OUT*) result: ARRAY OF CHAR;
+                                VAR (*OUT*) MoreToCome: BOOLEAN): BOOLEAN;
+
+    (* Returns one line of the server response to a command.            *)
+    (* MoreToCome is set if this is part of a multi-line response, and  *)
+    (* it's not the last line.   The function result is FALSE if we've  *)
+    (* lost the connection.                                             *)
+
+END FtpCl2.
+

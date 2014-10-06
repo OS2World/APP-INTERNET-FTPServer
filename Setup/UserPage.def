@@ -1,0 +1,33 @@
+DEFINITION MODULE UserPage;
+
+        (****************************************************************)
+        (*                                                              *)
+        (*                   PM Setup for FtpServer                     *)
+        (*                 User page of the notebook                    *)
+        (*                                                              *)
+        (*        Started:        11 October 1999                       *)
+        (*        Last edited:    16 April 2011                         *)
+        (*        Status:         OK                                    *)
+        (*                                                              *)
+        (****************************************************************)
+
+
+IMPORT CommonSettings;
+
+FROM OS2 IMPORT HWND;
+
+PROCEDURE CreatePage (notebook: HWND;  TNImode: BOOLEAN;
+                                VAR (*OUT*) PageID: CARDINAL): HWND;
+
+    (* Creates the user page and adds it to the notebook. *)
+
+PROCEDURE StoreData (hwnd: HWND);
+
+    (* Stores the list of users back to the INI file. *)
+
+PROCEDURE SetFont (VAR (*IN*) name: CommonSettings.FontName);
+
+    (* Sets the font of the text on this page. *)
+
+END UserPage.
+

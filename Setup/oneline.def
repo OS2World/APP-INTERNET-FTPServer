@@ -1,0 +1,24 @@
+DEFINITION MODULE OneLine;
+
+        (************************************************************)
+        (*                                                          *)
+        (*                   Setup for FtpServer                    *)
+        (*            Dialogue to edit a one-line string            *)
+        (*                                                          *)
+        (*    Started:        28 May 2013                           *)
+        (*    Last edited:    28 May 2013                           *)
+        (*    Status:         Working                               *)
+        (*                                                          *)
+        (************************************************************)
+
+
+FROM OS2 IMPORT HWND;
+
+PROCEDURE Edit (owner: HWND;  title: ARRAY OF CHAR;
+                       VAR (*INOUT*) item: ARRAY OF CHAR): BOOLEAN;
+
+    (* Edits the one-line string "item".  Returns FALSE if the edit     *)
+    (* was cancelled.                                                   *)
+
+END OneLine.
+

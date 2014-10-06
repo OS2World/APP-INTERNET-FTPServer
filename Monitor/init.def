@@ -1,0 +1,26 @@
+DEFINITION MODULE Init;
+
+        (****************************************************************)
+        (*                                                              *)
+        (*        This module contains the initialisation code          *)
+        (*                                                              *)
+        (*        Started:        29 March 2000                         *)
+        (*        Last edited:    30 March 2000                         *)
+        (*        Status:         OK                                    *)
+        (*                                                              *)
+        (****************************************************************)
+
+
+IMPORT OS2;
+
+PROCEDURE MainHab(): OS2.HAB;
+
+    (* Returns this program's anchor block handle (for the main thread). *)
+
+PROCEDURE [OS2.APIENTRY] MessageBox(hwndOwner : OS2.HWND
+                                   ;szText    : ARRAY OF CHAR
+                                   ;fsStyle   : OS2.ULONG
+                                   ;fBeep     : OS2.BOOL
+                                   ): OS2.ULONG;
+
+END Init.

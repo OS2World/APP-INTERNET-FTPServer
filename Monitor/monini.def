@@ -1,0 +1,36 @@
+DEFINITION MODULE MonINI;
+
+        (************************************************************)
+        (*                                                          *)
+        (*             Ftp Monitor INI file operations              *)
+        (*   This module opens and closes the Monitor INI file      *)
+        (*   The actual INI file operations are done by INIData     *)
+        (*                                                          *)
+        (*      Started:        18 November 2009                    *)
+        (*      Last edited:    18 November 2009                    *)
+        (*      Status:         OK                                  *)
+        (*                                                          *)
+        (************************************************************)
+
+
+FROM INIData IMPORT (* type *) HINI;
+
+PROCEDURE SetINIFileName (name: ARRAY OF CHAR;  TNImode: BOOLEAN);
+
+    (* Specifies the name of the file to be opened by OpenINIFile. *)
+
+PROCEDURE GetINIFileName (VAR (*OUT*) name: ARRAY OF CHAR;
+                              VAR (*OUT*) TNImode: BOOLEAN);
+
+    (* Returns the current INI file name and mode. *)
+
+PROCEDURE OpenINIFile(): HINI;
+
+    (* Opens our INI file, returns the handle. *)
+
+PROCEDURE CloseINIFile (hini: HINI);
+
+    (* Closes an INI file. *)
+
+END MonINI.
+
