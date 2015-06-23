@@ -1,0 +1,23 @@
+DEFINITION MODULE UIPControls;
+
+        (****************************************************************)
+        (*                                                              *)
+        (*                   PM Setup for FtpServer                     *)
+        (*    Dialogue to edit the IP address controls for one user     *)
+        (*                                                              *)
+        (*        Started:        9 September 2008                      *)
+        (*        Last edited:    17 September 2008                     *)
+        (*        Status:         OK                                    *)
+        (*                                                              *)
+        (****************************************************************)
+
+
+FROM OS2 IMPORT HWND;
+FROM IPFilters IMPORT ListPtr;
+
+PROCEDURE Edit (owner: HWND;  VAR (*INOUT*) L: ListPtr);
+
+    (* Edit list L.  *)
+
+END UIPControls.
+

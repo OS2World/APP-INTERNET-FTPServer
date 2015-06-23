@@ -1,0 +1,123 @@
+DEFINITION MODULE LoggedOnUsers;
+
+        (********************************************************)
+        (*                                                      *)
+        (*     Keeps track of the currently logged-on users     *)
+        (*                                                      *)
+        (*  Programmer:         P. Moylan                       *)
+        (*  Started:            24 October 1997                 *)
+        (*  Last edited:        5 September 2008                *)
+        (*  Status:             OK                              *)
+        (*                                                      *)
+        (********************************************************)
+
+FROM Sockets IMPORT
+    (* type *)  Socket, SockAddr;
+
+FROM FtpTransfers IMPORT
+    (* type *)  ClientFileInfo;
+
+FROM FDUsers IMPORT
+    (* type *)  UserCategory;
+
+FROM TransLog IMPORT
+    (* type *)  TransactionLogID;
+
+FROM Semaphores IMPORT
+    (* type *)  Semaphore;
+
+FROM Names IMPORT
+    (* type *)  UserName;
+
+(************************************************************************)
+
+TYPE ClientDataPointer;            (* is private *)
+
+(************************************************************************)
+
+PROCEDURE SetGuestLimit (limit: CARDINAL);
+
+    (* Sets the limit on the number of simultaneous guest users. *)
+
+PROCEDURE LoadSecurityParameters;
+
+    (* Reads the "same IP limit" and the client IP address filter from  *)
+    (* the INI file.  Old values, if any, are discarded.                *)
+
+PROCEDURE ClientAddressAcceptable (IPAddress: CARDINAL): BOOLEAN;
+
+    (* Returns TRUE if we are willing to accept connections from this address. *)
+
+PROCEDURE AddressForbidden (p: ClientDataPointer;  user: ARRAY OF CHAR): BOOLEAN;
+
+    (* Returns TRUE if this address is not on our list of acceptable list for this client. *)
+
+PROCEDURE StartSession (CommandSocket: Socket;  UserNumber, IPaddr: CARDINAL;
+                        LogID: TransactionLogID;  KeepAlive: Semaphore;
+                        VAR (*OUT*) UserHandle: ClientFileInfo): ClientDataPointer;
+
+    (* Creates a new session state record.  During lengthy operations           *)
+    (* we have to do a Signal(KeepAlive) every so often in order to stop the    *)
+    (* session from timing out.  The returned UserHandle can be used as a user  *)
+    (* identifier in calls to module FtpTransfers; it remains valid until       *)
+    (* EndSession is called.                                                    *)
+
+PROCEDURE EndSession (VAR (*INOUT*) p: ClientDataPointer);
+
+    (* Discards the session information. *)
+
+PROCEDURE NewUser (client: ClientDataPointer;
+                   Username: ARRAY OF CHAR;
+                   VAR (*OUT*) LogSession: BOOLEAN): UserCategory;
+
+    (* We assume that a session has already been established, but that there    *)
+    (* is not currently a logged-in user.  This procedure produces an updated   *)
+    (* session state that reflects the Username.                                *)
+
+PROCEDURE RemoveUser (client: ClientDataPointer);
+
+    (* Logs out the user, but does not terminate the session.  *)
+
+PROCEDURE RememberCommand (client: ClientDataPointer;
+                           VAR (*IN*) CommandString: ARRAY OF CHAR);
+
+    (* Stores CommandString as the last issued command. *)
+
+PROCEDURE CommandDone (client: ClientDataPointer): BOOLEAN;
+
+    (* Notes that we have finished processing the command specified in          *)
+    (* procedure RememberCommand.  Returns TRUE iff there is a shutdown in      *)
+    (* progress.                                                                *)
+
+PROCEDURE CheckForHammerer (client: ClientDataPointer);
+
+    (* This is called after a login failure (wrong password, etc.).  If we      *)
+    (* find repeated failures in the short term, we add the client IP address   *)
+    (* to our blacklist.                                                        *)
+
+PROCEDURE AbortDataOperations (client: ClientDataPointer);
+
+    (* Aborts the data transfer, if any, now in progress for this session. *)
+
+PROCEDURE KillUser (ID: ARRAY OF CHAR);
+
+    (* Attempts to kill the session whose ID is given.  This involves aborting the      *)
+    (* data operations, and then cancelling operations on the session's command         *)
+    (* socket.  The cancel will cause a higher-level module to detect that the          *)
+    (* session is no longer active, and then it is up to that higher-level module       *)
+    (* to clean up neatly.  Because we count on higher-level software to do the         *)
+    (* operations that will lead to an EndSession call, the present procedure does      *)
+    (* not actually remove the session from the list of active sessions.                *)
+
+PROCEDURE KillAllUsers (RightNow: BOOLEAN);
+
+    (* Aborts the data operations, and then cancels operations on the command socket,   *)
+    (* for all client sessions known to us.  This will cause a higher-level module to   *)
+    (* close those sessions.                                                            *)
+
+PROCEDURE ListAllUsers (S: Socket);
+
+    (* Sends a user listing to socket S. *)
+
+END LoggedOnUsers.
+

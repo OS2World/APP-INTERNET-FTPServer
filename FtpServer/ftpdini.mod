@@ -29,7 +29,7 @@ IMPLEMENTATION MODULE FtpdINI;
         (*   The actual INI file operations are done by INIData     *)
         (*                                                          *)
         (*      Started:        28 January 2002                     *)
-        (*      Last edited:    21 November 2008                    *)
+        (*      Last edited:    5 February 2015                     *)
         (*      Status:         OK                                  *)
         (*                                                          *)
         (************************************************************)
@@ -127,12 +127,14 @@ PROCEDURE SetHashMax (value: CARDINAL);
 
 (************************************************************************)
 
-PROCEDURE OpenINIForUser (name: ARRAY OF CHAR): INIData.HINI;
+PROCEDURE OpenINIForUser (name: ARRAY OF CHAR;
+                                CreateIfNotExists: BOOLEAN): INIData.HINI;
 
     (* Opens the INI file that contains the data for the named user. *)
 
     VAR INIname: Names.FilenameString;
         code, k, length: CARDINAL;
+        hini: INIData.HINI;
 
     BEGIN
         IF HashMax = 0 THEN
@@ -159,7 +161,13 @@ PROCEDURE OpenINIForUser (name: ARRAY OF CHAR): INIData.HINI;
             END (*FOR*);
 
         END (*IF*);
-        RETURN INIData.OpenINIFile (INIname, UseTNI);
+        hini := INIData.OpenINIFile (INIname, UseTNI);
+        IF (NOT INIData.INIValid(hini)) AND CreateIfNotExists THEN
+            hini := INIData.CreateINIFile (INIname, UseTNI);
+        END (*IF*);
+
+        RETURN hini;
+
     END OpenINIForUser;
 
 (************************************************************************)

@@ -27,15 +27,20 @@ MODULE LogAnalysis;
         (*                                                   *)
         (*     Programmer:    P. Moylan                      *)
         (*     Started:       25 August 1999                 *)
-        (*     Last edited:   19 February 2003               *)
+        (*     Last edited:   4 December 2014                *)
         (*     Status:        Working                        *)
         (*                                                   *)
         (*****************************************************)
+
 
 IMPORT Strings, STextIO, TextIO, IOChan, IOConsts, ChanConsts, SeqFile, ProgramArgs;
 
 FROM Storage IMPORT
     (* proc *)  ALLOCATE, DEALLOCATE;
+
+FROM VStrings IMPORT
+    (* type *)  VString,
+    (* proc *)  MakeVString, DiscardVString, VSCompare, WriteVString;
 
 (********************************************************************************)
 
@@ -44,7 +49,7 @@ CONST
 
 TYPE
     LogLine = ARRAY [0..511] OF CHAR;
-    FilenameString = ARRAY [0..255] OF CHAR;
+    FilenameString = ARRAY [0..511] OF CHAR;
     TimeString = ARRAY [0..18] OF CHAR;
     LineType = (eof, blank, starttime, endtime, upload, partupload, download,
                 partdownload, delete, other);
@@ -54,7 +59,7 @@ TYPE
 
     FilenameRecord = RECORD
                          next: FileListPtr;
-                         name: FilenameString;
+                         name: VString;
                          count: CARDINAL;
                      END (*RECORD*);
 
@@ -115,52 +120,35 @@ PROCEDURE SWriteRJCard (val, places: CARDINAL);
     END SWriteRJCard;
 
 (********************************************************************************)
-
-PROCEDURE FilenameCompare (VAR (*IN*) first, second: FilenameString)
-                                                     : Strings.CompareResults;
-
-    (* Like Strings.Compare, but ignoring alphabetic case.  *)
-
-    VAR name1, name2: FilenameString;
-
-    BEGIN
-        name1 := first;
-        Strings.Capitalize (name1);
-        name2 := second;
-        Strings.Capitalize (name2);
-        RETURN Strings.Compare (name1, name2);
-    END FilenameCompare;
-
-(********************************************************************************)
 (*                          OPERATIONS ON A FILE LIST                           *)
 (********************************************************************************)
 
-PROCEDURE MergeIntoFileList (N: LineType;  VAR (*IN*) name: FilenameString);
+PROCEDURE MergeIntoFileList (N: LineType;  VName: VString);
 
     (* Adds "name" into Files[N], either by inserting a new list entry   *)
     (* or incrementing the count field of an existing entry.             *)
 
-    VAR previous, current, p: FileListPtr;  comparison: Strings.CompareResults;
+    VAR previous, current, p: FileListPtr;  comparison: INTEGER;
 
     BEGIN
         (* Find a suitable insertion point. *)
 
-        previous := NIL;  current := Files[N];  comparison := Strings.greater;
+        previous := NIL;  current := Files[N];  comparison := +1;
         LOOP
             IF current = NIL THEN EXIT(*LOOP*) END(*IF*);
-            comparison := FilenameCompare (name, current^.name);
-            IF comparison <> Strings.greater THEN EXIT(*LOOP*) END(*IF*);
+            comparison := VSCompare (VName, current^.name);
+            IF comparison <= 0 THEN EXIT(*LOOP*) END(*IF*);
             previous := current;  current := current^.next;
         END (*LOOP*);
 
         (* Now do the insertion. *)
 
-        IF comparison = Strings.equal THEN
+        IF comparison = 0 THEN
             INC (current^.count);
         ELSE
             NEW (p);
             p^.count := 1;
-            p^.name := name;
+            p^.name := VName;
 
             (* Insert between previous and current. *)
 
@@ -193,7 +181,7 @@ PROCEDURE WriteFileList (p: FileListPtr);
         REPEAT
             INC (total, p^.count);
             SWriteRJCard (p^.count, 8);  STextIO.WriteString ("  ");
-            STextIO.WriteString (p^.name);  STextIO.WriteLn;
+            WriteVString (p^.name);  STextIO.WriteLn;
             p := p^.next;
         UNTIL p = NIL;
         STextIO.WriteString ("A total of ");  SWriteCard (total);
@@ -211,6 +199,7 @@ PROCEDURE DiscardFileList (VAR (*INOUT*) p: FileListPtr);
     BEGIN
         WHILE p <> NIL DO
             q := p^.next;
+            DiscardVString (p^.name);
             DISPOSE (p);
             p := q;
         END (*WHILE*);
@@ -271,18 +260,25 @@ PROCEDURE ReadOneLine (cid: IOChan.ChanId;  VAR (*OUT*) buffer: ARRAY OF CHAR);
 
 (********************************************************************************)
 
-PROCEDURE GetFileName (VAR (*IN*) buffer: LogLine;
+PROCEDURE GetFileName (StripTrailing: BOOLEAN;  VAR (*IN*) buffer: LogLine;
                            VAR (*INOUT*) result: FilenameString);
 
-    (* Picks up a file name from the buffer. *)
+    (* Picks up a file name from the buffer.  If StripTrailing is TRUE, we      *)
+    (* must remove a parenthesised comment at the end of the line.              *)
 
-    VAR pos: CARDINAL;  found: BOOLEAN;
+    VAR pos, length: CARDINAL;  found: BOOLEAN;
 
     BEGIN
         Strings.Assign (buffer, result);
-        Strings.FindNext (' ', result, 0, found, pos);
-        IF found THEN
-            result[pos] := Nul;
+        length := Strings.Length (result);
+        IF StripTrailing AND (length >= 2) AND (result[length-1] = ')') THEN
+            Strings.FindPrev ('(', result, length-2, found, pos);
+            IF found THEN
+                IF (pos > 0) AND (result[pos-1] = ' ') THEN
+                    DEC (pos);
+                END (*IF*);
+                result[pos] := Nul;
+            END (*IF*);
         END (*IF*);
 
         (* Change all '/' to '\'. *)
@@ -306,6 +302,7 @@ PROCEDURE ReadOneGroup (cid: IOChan.ChanId): BOOLEAN;
     VAR buffer: LogLine;
         AtEOF: BOOLEAN;  kind: LineType;
         NameBuffer: FilenameString;
+        VName: VString;
 
     BEGIN
         AtEOF := FALSE;
@@ -329,8 +326,9 @@ PROCEDURE ReadOneGroup (cid: IOChan.ChanId): BOOLEAN;
                         Strings.Assign (buffer, EndTime);
                     END (*IF*);
               | upload..delete:
-                    GetFileName (buffer, NameBuffer);
-                    MergeIntoFileList (kind, NameBuffer);
+                    GetFileName (kind < delete, buffer, NameBuffer);
+                    VName := MakeVString (NameBuffer);
+                    MergeIntoFileList (kind, VName);
             ELSE
                 (* No special processing needed. *)
             END (*CASE*);

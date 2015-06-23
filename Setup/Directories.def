@@ -1,0 +1,55 @@
+DEFINITION MODULE Directories;
+
+        (********************************************************)
+        (*                                                      *)
+        (*            Looking up file directories               *)
+        (*                                                      *)
+        (*  Programmer:         P. Moylan                       *)
+        (*  Started:            24 November 1999                *)
+        (*  Last edited:        7 December 1999                 *)
+        (*  Status:             OK                              *)
+        (*                                                      *)
+        (********************************************************)
+
+
+IMPORT OS2;
+
+(************************************************************************)
+(*                        DIRECTORY SEARCHES                            *)
+(************************************************************************)
+
+CONST
+    FileNameLength = OS2.CCHMAXPATHCOMP;
+
+TYPE
+    FileNameSubscript = [0..FileNameLength-1];
+    FileName = ARRAY FileNameSubscript OF CHAR;
+
+    DirectorySearchHandle;      (* is private *)
+
+PROCEDURE FileCheck (FullName: FileName;
+                     VAR (*OUT*) exists, IsAFile: BOOLEAN);
+
+    (* Returns with exists=TRUE if the file exists, and IsAFile=TRUE    *)
+    (* if this is a non-directory file.                                 *)
+
+PROCEDURE FirstSubdirectory (parent: FileName;
+                           VAR (*OUT*) Name: FileName;
+                           VAR (*OUT*) D: DirectorySearchHandle): BOOLEAN;
+
+    (* Sets Name to the name of the first subdirectory in parent, and   *)
+    (* returns TRUE if such a subdirectory exists.  D is the handle for *)
+    (* further searches in the same directory.                          *)
+
+PROCEDURE NextSubdirectory (VAR (*INOUT*) D: DirectorySearchHandle;
+                            VAR (*OUT*) Name: FileName): BOOLEAN;
+
+    (* Read the next directory entry satisfying the search criteria     *)
+    (* specified by the FirstSubdirectory call.                         *)
+
+PROCEDURE SubdirSearchDone (VAR (*INOUT*) D: DirectorySearchHandle);
+
+    (* Discard the search handle. *)
+
+END Directories.
+

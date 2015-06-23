@@ -1,0 +1,25 @@
+DEFINITION MODULE EditFilter;
+
+        (************************************************************)
+        (*                                                          *)
+        (*                 PM Setup for FtpServer                   *)
+        (*      Dialogue to edit one allow/refuse filter line       *)
+        (*                                                          *)
+        (*    Started:        14 October 1999                       *)
+        (*    Last edited:    17 September 2008                     *)
+        (*    Status:         OK                                    *)
+        (*                                                          *)
+        (************************************************************)
+
+
+FROM OS2 IMPORT HWND;
+FROM IPFilters IMPORT ListPtr;
+
+
+PROCEDURE Edit (owner: HWND;  p: ListPtr): BOOLEAN;
+
+    (* Edit the filter line p^, which is the current item in the        *)
+    (* listbox whose handle is "owner".                                 *)
+
+END EditFilter.
+

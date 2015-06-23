@@ -7,7 +7,7 @@ DEFINITION MODULE FDUsers;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            30 August 1997                  *)
-        (*  Last edited:        25 May 2014                     *)
+        (*  Last edited:        16 June 2015                    *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (********************************************************)
@@ -25,6 +25,7 @@ TYPE
 
 
 PROCEDURE ReadUserData (name: ARRAY OF CHAR;
+                          VAR (*IN*)  host: ARRAY OF CHAR;
                           VAR (*OUT*) SpeedLimit: CARDINAL;
                           VAR (*OUT*) UpSpeedLimit: CARDINAL;
                           VAR (*OUT*) UpSizeLimit: CARD64;

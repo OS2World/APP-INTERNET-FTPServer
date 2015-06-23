@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  LoadPRM utility for FtpServer                                         *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2015   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ MODULE LoadPRM;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            5 March 1998                    *)
-        (*  Last edited:        10 June 2013                    *)
+        (*  Last edited:        5 February 2015                 *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (********************************************************)
@@ -62,6 +62,14 @@ IMPORT IOChan, TextIO, STextIO, Strings, OS2, FileOps;
 
 FROM ProgramArgs IMPORT
     (* proc *)  ArgChan, IsArgPresent;
+
+FROM FtpdINI IMPORT
+    (* proc *)  SetINIFileName, SetHashMax, OpenINIFile, CloseINIFile,
+                OpenINIForUser;
+
+FROM INIData IMPORT
+    (* type *)  HINI,
+    (* proc *)  INIValid, INIGet, INIPut, INIPutString, INIPutBinary;
 
 FROM Storage IMPORT
     (* proc *)  ALLOCATE, DEALLOCATE;
@@ -197,7 +205,7 @@ PROCEDURE DumpUserData (U: User);
 *)
 
 (********************************************************************************)
-(*                                PARSER                                        *)
+(*                    PARSER - READS USER DATA FROM PRM FILE                    *)
 (********************************************************************************)
 
 PROCEDURE ToLower (VAR (*INOUT*) string: ARRAY OF CHAR);
@@ -211,7 +219,7 @@ PROCEDURE ToLower (VAR (*INOUT*) string: ARRAY OF CHAR);
     VAR j: CARDINAL;
 
     BEGIN
-        FOR j := 0 TO HIGH(string) DO
+        FOR j := 0 TO LENGTH(string) DO
             IF string[j] IN CharSet {'A'..'Z'} THEN
                 INC (string[j], shift);
             END (*IF*);
@@ -982,10 +990,10 @@ PROCEDURE SizeOfTreeData (D: DirEntryPtr;
     END SizeOfTreeData;
 
 (************************************************************************)
-(*                      MAIN CONVERSION PROCEDURES                      *)
+(*                          OUTPUT TO INI FILE                          *)
 (************************************************************************)
 
-PROCEDURE WriteHideList (hini: OS2.HINI;  U: User);
+PROCEDURE WriteHideList (hini: HINI;  U: User);
 
     TYPE Big = [0..65535];
 
@@ -1033,7 +1041,7 @@ PROCEDURE WriteHideList (hini: OS2.HINI;  U: User);
         END (*WHILE*);
         IF bufptr <> NIL THEN
             bufptr^[j] := Nul;
-            OS2.PrfWriteProfileData (hini, U^.username, "HideList", bufptr, size);
+            INIPutBinary (hini, U^.username, "HideList", bufptr^, size);
             DEALLOCATE (bufptr, size);
         END (*IF*);
     END WriteHideList;
@@ -1044,39 +1052,30 @@ PROCEDURE WriteUserData (U: User): BOOLEAN;
 
     TYPE Big = [0..65535];
 
-    VAR hini: OS2.HINI;  size, index: CARDINAL;
+    VAR hini: HINI;  size, index: CARDINAL;
         bufptr: POINTER TO ARRAY Big OF CHAR;
 
     BEGIN
-        hini := OS2.PrfOpenProfile (hab, "ftpd.ini");
-        IF hini = OS2.NULLHANDLE THEN
+        hini := OpenINIForUser (U^.username, TRUE);
+        IF NOT INIValid(hini) THEN
             RETURN FALSE;
         END (*IF*);
-        OS2.PrfWriteProfileData (hini, U^.username, "Category",
-                                ADR(U^.category), SIZE(UserCategory));
-        OS2.PrfWriteProfileData (hini, U^.username, "Password",
-                                ADR(U^.Password), SIZE(PassString));
+        INIPut (hini, U^.username, "Category", U^.category);
+        INIPutString (hini, U^.username, "Password", U^.Password);
         index := ORD (U^.SingleUse);
-        OS2.PrfWriteProfileData (hini, U^.username, "LoginLimit",
-                                ADR(index), SIZE(CARDINAL));
-        OS2.PrfWriteProfileData (hini, U^.username, "UseTemplate",
-                                ADR(U^.UseTemplate), SIZE(BOOLEAN));
+        INIPut (hini, U^.username, "LoginLimit", index);
+        INIPut (hini, U^.username, "UseTemplate", U^.UseTemplate);
         IF U^.UserLimitSpecified THEN
-            OS2.PrfWriteProfileData (hini, U^.username, "UserLimit",
-                                    ADR(U^.UserLimit), SIZE(CARDINAL));
+            INIPut (hini, U^.username, "UserLimit", U^.UserLimit);
         END (*IF*);
         IF U^.SpeedLimitSpecified THEN
-            OS2.PrfWriteProfileData (hini, U^.username, "SpeedLimit",
-                                    ADR(U^.SpeedLimit), SIZE(CARDINAL));
-            OS2.PrfWriteProfileData (hini, U^.username, "RealName",
-                                    ADR(U^.RealName), LENGTH(U^.RealName));
-            OS2.PrfWriteProfileData (hini, U^.username, "Notes",
-                                    ADR(U^.Notes), LENGTH(U^.Notes));
+            INIPut (hini, U^.username, "SpeedLimit", U^.SpeedLimit);
+            INIPutString (hini, U^.username, "RealName", U^.RealName);
+            INIPutString (hini, U^.username, "Notes", U^.Notes);
         END (*IF*);
 
         IF U^.UseTemplate THEN
-            OS2.PrfWriteProfileData (hini, U^.username, "TemplateName",
-                                ADR(U^.TemplateName), SIZE(PassString));
+            INIPut (hini, U^.username, "TemplateName", U^.TemplateName);
             size := 0;
         ELSE
             size := SizeOfTreeData (U^.TreeRoot,
@@ -1097,7 +1096,7 @@ PROCEDURE WriteUserData (U: User): BOOLEAN;
 
         (* Copy the result from bufptr^ to the INI file. *)
 
-        OS2.PrfWriteProfileData (hini, U^.username, "Volume", bufptr, size);
+        INIPutBinary (hini, U^.username, "Volume", bufptr^, size);
         IF size > 0 THEN
             DEALLOCATE (bufptr, size);
         END (*IF*);
@@ -1105,12 +1104,14 @@ PROCEDURE WriteUserData (U: User): BOOLEAN;
         (* Write out the HideList. *)
 
         WriteHideList (hini, U);
-        OS2.PrfCloseProfile (hini);
+        CloseINIFile (hini);
 
         RETURN TRUE;
 
     END WriteUserData;
 
+(************************************************************************)
+(*                      MAIN CONVERSION PROCEDURES                      *)
 (************************************************************************)
 
 PROCEDURE ConvertOneUser (filename, username: ARRAY OF CHAR);
@@ -1123,11 +1124,10 @@ PROCEDURE ConvertOneUser (filename, username: ARRAY OF CHAR);
         U := ReadUserData (filename, username);
         IF U <> NIL THEN
             IF WriteUserData (U) THEN
-                STextIO.WriteString ("Converted ");
+                STextIO.WriteString ("Done");
             ELSE
-                STextIO.WriteString ("Failed to convert ");
+                STextIO.WriteString ("Failed");
             END (*IF*);
-            STextIO.WriteString (filename);
             STextIO.WriteLn;
             DestroyUserData (U);
         ELSE
@@ -1138,34 +1138,49 @@ PROCEDURE ConvertOneUser (filename, username: ARRAY OF CHAR);
 
 (********************************************************************************)
 
-PROCEDURE GetParameter (VAR (*OUT*) result: ARRAY OF CHAR);
+PROCEDURE GetParameter (VAR (*OUT*) result: ARRAY OF CHAR): BOOLEAN;
 
-    (* Picks up program argument from the command line. *)
+    (* Picks up program argument from the command line.  The function   *)
+    (* result is TRUE iff a -t parameter is also present.               *)
 
     CONST Testing = FALSE;
 
-    VAR args: IOChan.ChanId;  j: CARDINAL;
+    VAR args: IOChan.ChanId;  k: CARDINAL;
+        UseTNI: BOOLEAN;
 
     BEGIN
         IF Testing THEN
-            Strings.Assign ("anonymous", result);
-            j := LENGTH (result);
+            Strings.Assign ("-t test/t2/*", result);
         ELSE
             args := ArgChan();
             IF IsArgPresent() THEN
                 TextIO.ReadString (args, result);
-                j := LENGTH (result);
             ELSE
-                j := 0;
+                result[0] := Nul;
             END (*IF*);
+        END (*IF*);
+
+        (* Check for -t option. *)
+
+        UseTNI := FALSE;
+        k := 0;
+        WHILE result[k] = ' ' DO INC (k) END (*WHILE*);
+        IF (result[k] = '-') AND (CAP(result[k+1]) = 'T') THEN
+            UseTNI := TRUE;
+            INC (k, 2);
+            WHILE result[k] = ' ' DO INC (k) END (*WHILE*);
+            Strings.Delete (result, 0, k);
         END (*IF*);
 
         (* Strip trailing spaces. *)
 
-        WHILE (j > 0) AND (result[j-1] = ' ') DO
-            DEC (j);
+        k := LENGTH (result);
+        WHILE (k > 0) AND (result[k-1] = ' ') DO
+            DEC (k);
         END (*WHILE*);
-        result[j] := CHR(0);
+        result[k] := CHR(0);
+
+        RETURN UseTNI;
 
     END GetParameter;
 
@@ -1175,21 +1190,70 @@ PROCEDURE PerformTheConversions;
 
     (* Reads command-line argument, converts all the PRM files that match. *)
 
-    VAR filename, username: ARRAY [0..511] OF CHAR;
+    VAR mask, filename, dirname, username: ARRAY [0..511] OF CHAR;
         D: FileOps.DirectoryEntry;
-        pos: CARDINAL;  found: BOOLEAN;
+        pos, pos2, HashMax: CARDINAL;  found, found2, UseTNI: BOOLEAN;
+        hini: HINI;
+        app: ARRAY [0..4] OF CHAR;
 
     BEGIN
-        GetParameter (filename);
-        ToLower (filename);
-        Strings.FindPrev ('.prm', filename, Strings.Length(filename), found, pos);
-        IF NOT found THEN
-            Strings.Append (".prm", filename);
+        UseTNI := GetParameter (mask);
+        SetINIFileName ("ftpd.ini", UseTNI);
+        hini := OpenINIFile();
+        app := "$SYS";
+        HashMax := 0;
+        IF INIValid(hini) THEN
+            username := "$SYS";
+            found := INIGet (hini, username, "HashMax", HashMax);
+        END (*IF*);
+        CloseINIFile (hini);
+        SetHashMax (HashMax);
+
+        (* Extract the directory name, if present. *)
+
+        ToLower (mask);
+        Strings.FindPrev ('\', mask, Strings.Length(mask), found, pos);
+        Strings.FindPrev ('/', mask, Strings.Length(mask), found2, pos2);
+        IF found2 THEN
+            IF NOT(found) OR (pos2 > pos) THEN
+                pos := pos2;  found := TRUE;
+            END (*IF*);
+        END (*IF*);
+        Strings.FindPrev (':', mask, Strings.Length(mask), found2, pos2);
+        IF found2 THEN
+            IF NOT(found) OR (pos2 > pos) THEN
+                pos := pos2;  found := TRUE;
+            END (*IF*);
         END (*IF*);
 
-        IF FileOps.FirstDirEntry (filename, FALSE, FALSE, D) THEN
+        (* We want mask to be the full file specification, including    *)
+        (* directory and wildcards if present, and dirname to be        *)
+        (* just the directory part of mask.                             *)
+
+        IF found THEN
+            Strings.Assign (mask, dirname);
+            IF NOT found2 THEN
+                dirname[pos] := '\';
+            END (*IF*);
+            INC(pos);
+            dirname[pos] := Nul;
+        ELSE
+            dirname[0] := Nul;
+        END (*IF*);
+
+        (* Append a ".prm" extension if it is missing. *)
+
+        Strings.FindPrev ('.prm', mask, Strings.Length(mask), found, pos);
+        IF NOT found THEN
+            Strings.Append (".prm", mask);
+        END (*IF*);
+
+        (* We have a loop below in case of wildcards in the mask. *)
+
+        IF FileOps.FirstDirEntry (mask, FALSE, FALSE, D) THEN
             REPEAT
-                Strings.Assign (D.name, filename);
+                Strings.Assign (dirname, filename);
+                Strings.Append (D.name, filename);
                 Strings.Assign (D.name, username);
                 ToLower (username);
                 Strings.FindPrev (".prm", username, LENGTH(username),

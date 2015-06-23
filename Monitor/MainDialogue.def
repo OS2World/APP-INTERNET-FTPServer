@@ -1,0 +1,18 @@
+DEFINITION MODULE MainDialogue;
+
+        (****************************************************************)
+        (*                    Monitor for FtpServer                     *)
+        (*                        Main dialogue                         *)
+        (*                                                              *)
+        (*    Started:        29 March 2000                             *)
+        (*    Last edited:    29 March 2000                             *)
+        (*    Status:         OK                                        *)
+        (*                                                              *)
+        (****************************************************************)
+
+PROCEDURE Create;
+
+    (* Creates the main dialogue box. *)
+
+END MainDialogue.
+

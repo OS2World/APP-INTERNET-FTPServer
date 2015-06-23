@@ -28,7 +28,7 @@ MODULE StorePRM;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            6 March 1998                    *)
-        (*  Last edited:        9 June 2013                     *)
+        (*  Last edited:        6 February 2015                 *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (********************************************************)
@@ -47,6 +47,12 @@ FROM INIData IMPORT
 
 FROM ProgramArgs IMPORT
     (* proc *)  ArgChan, IsArgPresent;
+
+FROM FileOps IMPORT
+    (* proc *)  Exists;
+
+FROM WildCard IMPORT
+    (* proc *)  WildMatch;
 
 FROM Storage IMPORT
     (* proc *)  ALLOCATE, DEALLOCATE;
@@ -70,6 +76,42 @@ VAR
     (* Anchor block handle for this application.  *)
 
     hab: OS2.HAB;
+
+(********************************************************************************)
+(*                           MISCELLANEOUS UTILITIES                            *)
+(********************************************************************************)
+
+PROCEDURE ToLower (VAR (*INOUT*) string: ARRAY OF CHAR);
+
+    (* Converts all letters in string to lower case. *)
+
+    TYPE CharSet = SET OF CHAR;
+
+    CONST shift = ORD('a') - ORD('A');
+
+    VAR j: CARDINAL;
+
+    BEGIN
+        FOR j := 0 TO LENGTH(string) DO
+            IF string[j] IN CharSet {'A'..'Z'} THEN
+                INC (string[j], shift);
+            END (*IF*);
+        END (*FOR*);
+    END ToLower;
+
+(********************************************************************************)
+
+PROCEDURE WriteCard (N: CARDINAL);
+
+    (* Write decimal number to standard output. *)
+
+    BEGIN
+        IF N > 9 THEN
+            WriteCard (N DIV 10);
+            N := N MOD 10;
+        END (*IF*);
+        STextIO.WriteChar (CHR(ORD('0') + N));
+    END WriteCard;
 
 (********************************************************************************)
 (*                          OUTPUT TO PRM FILE                                  *)
@@ -144,17 +186,19 @@ PROCEDURE FWriteLn (cid: IOChan.ChanId);
 (************************************************************************)
 
 PROCEDURE OpenPRMFile (VAR (*OUT*) cid: IOChan.ChanId;
-                       username: ARRAY OF CHAR): BOOLEAN;
+                       VAR (*IN*) dirname, username: ARRAY OF CHAR): BOOLEAN;
 
-    VAR filename, BAKname: FileNameString;
+    VAR filename, basename, BAKname: FileNameString;
         result: ChanConsts.OpenResults;  dummy: BOOLEAN;
 
     BEGIN
-        Strings.Assign (username, filename);
+        Strings.Assign (dirname, filename);
+        Strings.Append (username, filename);
+        Strings.Assign (filename, basename);
         Strings.Append (".PRM", filename);
         SeqFile.OpenWrite (cid, filename, ChanConsts.write+ChanConsts.raw, result);
         IF result = ChanConsts.fileExists THEN
-            Strings.Assign (username, BAKname);
+            Strings.Assign (basename, BAKname);
             Strings.Append (".BAK", BAKname);
             FileSys.Remove (BAKname, dummy);
             FileSys.Rename (filename, BAKname, dummy);
@@ -354,9 +398,11 @@ PROCEDURE WriteHideList (cid: IOChan.ChanId;  hini: HINI;  username: ARRAY OF CH
 
 (****************************************************************************)
 
-PROCEDURE ConvertOneUser (hini: HINI;  username: ARRAY OF CHAR);
+PROCEDURE ConvertOneUser (hini: HINI;
+                       VAR (*IN*) dirname, username: ARRAY OF CHAR): BOOLEAN;
 
     (* Converts one INI file entry to a PRM file. *)
+    (* Returns FALSE if the operation failed.     *)
 
     TYPE BufferIndex = [0..65535];
         CategoryMap = ARRAY UserCategory OF CHAR;
@@ -376,7 +422,7 @@ PROCEDURE ConvertOneUser (hini: HINI;  username: ARRAY OF CHAR);
         STextIO.WriteString ("Converting ");
         STextIO.WriteString (username);
         STextIO.WriteLn;
-        IF OpenPRMFile (cid, username) THEN
+        IF OpenPRMFile (cid, dirname, username) THEN
 
             UserLimit := MAX(CARDINAL);
             SpeedLimit := MAX(CARDINAL);
@@ -456,65 +502,97 @@ PROCEDURE ConvertOneUser (hini: HINI;  username: ARRAY OF CHAR);
             WriteHideList(cid, hini, username);
 
             SeqFile.Close (cid);
+            RETURN TRUE;
+
         ELSE
             STextIO.WriteString ("Can't create ");
             STextIO.WriteString (username);
             STextIO.WriteString (".PRM");
             STextIO.WriteLn;
+            RETURN FALSE;
         END (*IF*);
     END ConvertOneUser;
 
-(********************************************************************************)
+(************************************************************************)
 
-PROCEDURE WildcardMatch (string, mask: ARRAY OF CHAR): BOOLEAN;
+PROCEDURE ConvertFromINIFile (hini: HINI;
+                                VAR (*IN*) dirname,
+                                           mask: ARRAY OF CHAR): CARDINAL;
 
-    (* Checks for string=mask, except that mask is allowed to contain '*' and   *)
-    (* '?' wildcard characters.  In this version, '*' is allowed only at the end.*)
+    (* Converts all users in this INI file that match the mask.         *)
+    (* The caller must already have opened the INI file.                *)
+    (* Returns the number of conversions.                               *)
 
-    VAR k: CARDINAL;
+    VAR state: StringReadState;  count: CARDINAL;
+        Blank: ARRAY [0..1] OF CHAR;
+        sys: ARRAY [0..5] OF CHAR;
+        Name: ARRAY [0..255] OF CHAR;
 
     BEGIN
-        k := 0;
+        Blank := "";
+        sys := "$SYS";
+        count := 0;
+        GetStringList (hini, Blank, Blank, state);
         LOOP
-            IF (k > HIGH(mask)) OR (mask[k] = Nul) THEN
-                RETURN (k > HIGH(string)) OR (string[k] = Nul);
-            ELSIF mask[k] = '*' THEN
-                RETURN TRUE;
-            ELSIF (k > HIGH(string)) OR (string[k] = Nul) THEN
-                RETURN FALSE;
-            ELSIF mask[k] = '?' THEN
-                INC (k);
-            ELSIF CAP(string[k]) <> CAP(mask[k]) THEN
-                RETURN FALSE;
-            ELSE
-                INC (k);
+            NextString (state, Name);
+            IF Name[0] = Nul THEN
+                EXIT (*LOOP*);
+            END (*IF*);
+            IF WildMatch (Name, mask) AND NOT WildMatch (Name, sys) THEN
+                IF ConvertOneUser (hini, dirname, Name) THEN
+                   INC (count);
+                END (*IF*);
             END (*IF*);
         END (*LOOP*);
-    END WildcardMatch;
+        CloseStringList (state);
+        RETURN count;
+    END ConvertFromINIFile;
 
-(********************************************************************************)
+(************************************************************************)
 
-PROCEDURE GetParameter (VAR (*OUT*) result: ARRAY OF CHAR);
+PROCEDURE GetParameter (VAR (*OUT*) result: ARRAY OF CHAR): BOOLEAN;
 
-    (* Picks up program argument from the command line. *)
+    (* Picks up program argument from the command line.  The function   *)
+    (* result is TRUE iff a -t parameter is also present.               *)
 
-    VAR args: IOChan.ChanId;  j: CARDINAL;
+    CONST testing = FALSE;
+
+    VAR args: IOChan.ChanId;  j, k: CARDINAL;  UseTNI: BOOLEAN;
 
     BEGIN
-        args := ArgChan();
-        IF IsArgPresent() THEN
-            TextIO.ReadString (args, result);
-            j := LENGTH (result);
+        IF testing THEN
+            Strings.Assign ("-t test/t2/*", result);
         ELSE
-            j := 0;
+            args := ArgChan();
+            IF IsArgPresent() THEN
+                TextIO.ReadString (args, result);
+            ELSE
+                result[0] := Nul;
+            END (*IF*);
+        END (*IF*);
+
+        (* Check for -t option. *)
+
+        UseTNI := FALSE;
+        k := 0;
+        WHILE result[k] = ' ' DO INC (k) END (*WHILE*);
+        IF (result[k] = '-') AND (CAP(result[k+1]) = 'T') THEN
+            UseTNI := TRUE;
+            INC (k, 2);
+            WHILE result[k] = ' ' DO INC (k) END (*WHILE*);
+            Strings.Delete (result, 0, k);
         END (*IF*);
 
         (* Strip trailing spaces. *)
 
+        j := LENGTH (result);
         WHILE (j > 0) AND (result[j-1] = ' ') DO
             DEC (j);
         END (*WHILE*);
         result[j] := CHR(0);
+
+        RETURN UseTNI;
+
     END GetParameter;
 
 (************************************************************************)
@@ -525,38 +603,106 @@ PROCEDURE PerformTheConversions;
 
     TYPE BufferIndex = [0..65535];
 
-    VAR mask: ARRAY [0..127] OF CHAR;
-        state: StringReadState;
-        hini: HINI;
-        BufferSize: CARDINAL;
+    VAR mask, dirname: ARRAY [0..511] OF CHAR;
         Name: ARRAY [0..31] OF CHAR;
-        Blank: ARRAY [0..1] OF CHAR;
+        hini: HINI;
+        pos, pos2, HashMax, j, k, code, count: CARDINAL;
+        found, found2, UseTNI: BOOLEAN;
 
     BEGIN
-        Blank := "";
-        GetParameter (mask);
-        Name := "ftpd.ini";
-        hini := OpenINIFile (Name, FALSE);
-        IF (NOT INIValid(hini))
-                  OR NOT ItemSize (hini, Blank, "", BufferSize)
-                  OR (BufferSize = 0) THEN
-            STextIO.WriteString ("Nothing to convert");
+        UseTNI := GetParameter (mask);
+
+        (* Extract directory name, if present, from the mask. *)
+
+        ToLower (mask);
+        Strings.FindPrev ('\', mask, Strings.Length(mask), found, pos);
+        Strings.FindPrev ('/', mask, Strings.Length(mask), found2, pos2);
+        IF found2 THEN
+            IF NOT(found) OR (pos2 > pos) THEN
+                pos := pos2;  found := TRUE;
+            END (*IF*);
+        END (*IF*);
+        Strings.FindPrev (':', mask, Strings.Length(mask), found2, pos2);
+        IF found2 THEN
+            IF NOT(found) OR (pos2 > pos) THEN
+                pos := pos2;  found := TRUE;
+            END (*IF*);
+        END (*IF*);
+        IF found THEN
+            Strings.Assign (mask, dirname);
+            IF found2 THEN
+                Strings.Delete (mask, 0, pos);
+            ELSE
+                Strings.Delete (mask, 0, pos+1);
+                dirname[pos] := '\';
+            END (*IF*);
+            INC(pos);
+            dirname[pos] := Nul;
+        ELSE
+            dirname[0] := Nul;
+        END (*IF*);
+
+        (* Remove a ".prm" extension if it is present. *)
+
+        Strings.FindPrev ('.prm', mask, Strings.Length(mask), found, pos);
+        IF found THEN
+            mask[pos] := Nul;
+        END (*IF*);
+        IF mask[0] = Nul THEN
+            STextIO.WriteString ("You must specify a username mask.");
             STextIO.WriteLn;
             RETURN;
         END (*IF*);
 
-        GetStringList (hini, Blank, Blank, state);
-        LOOP
-            NextString (state, Name);
-            IF Name[0] = Nul THEN
-                EXIT (*LOOP*);
-            END (*IF*);
-            IF WildcardMatch (Name, mask) AND NOT WildcardMatch (Name, '$SYS') THEN
-                ConvertOneUser (hini, Name);
-            END (*IF*);
-        END (*LOOP*);
-        CloseStringList (state);
-        CloseINIFile (hini);
+        (* Get the HashMax value. *)
+
+        Name := "ftpd.ini";
+        hini := OpenINIFile (Name, UseTNI);
+        IF (NOT INIValid(hini)) THEN
+            STextIO.WriteString ("Missing INI file.");
+            STextIO.WriteLn;
+            RETURN;
+        END (*IF*);
+        HashMax := 0;
+        IF INIValid(hini) THEN
+            Name := "$SYS";
+            found := INIGet (hini, Name, "HashMax", HashMax);
+        END (*IF*);
+
+        (* Search through all valid INI file names, and convert *)
+        (* from those.                                          *)
+
+        IF HashMax = 0 THEN
+            count := ConvertFromINIFile (hini, dirname, mask);
+            CloseINIFile (hini);
+        ELSE
+            count := 0;
+            Name := "ftpd    .ini";
+            FOR j := 0 TO 9999 DO
+                code := j;
+                FOR k := 7 TO 4 BY -1 DO
+                    Name[k] := CHR(code MOD 10 + ORD('0'));
+                    code := code DIV 10;
+                END (*FOR*);
+                IF Exists (Name) THEN
+                    hini := OpenINIFile (Name, UseTNI);
+                    INC (count, ConvertFromINIFile (hini, dirname, mask));
+                    CloseINIFile (hini);
+                END (*IF*);
+            END (*FOR*);
+        END (*IF*);
+
+        IF count = 0 THEN
+            STextIO.WriteString ("No");
+        ELSE
+            WriteCard (count);
+        END (*IF*);
+        STextIO.WriteString (" user");
+        IF count <> 1 THEN
+            STextIO.WriteChar ('s');
+        END (*IF*);
+        STextIO.WriteString (" converted.");
+        STextIO.WriteLn;
 
     END PerformTheConversions;
 

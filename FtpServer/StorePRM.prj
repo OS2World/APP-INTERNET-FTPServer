@@ -1,3 +1,4 @@
+-multithread+
 -INCL_DOS:+
 -INCL_DOSERRORS:+
 -INCL_SUB:+

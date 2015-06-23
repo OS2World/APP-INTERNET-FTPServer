@@ -148,6 +148,7 @@ cd ..
 'del src3.zip /N'
 'cd ..'
 
+'del ..\ftpserSrc'ver'.zip /N 2>nul'
 'zip -q -r ..\ftpserSrc'ver'.zip .'
 
 /* Remove temporary files. */

@@ -1,0 +1,60 @@
+DEFINITION MODULE IPFilters;
+
+        (****************************************************************)
+        (*                                                              *)
+        (*                   PM Setup for FtpServer                     *)
+        (*             Manipulation of IP filter elements               *)
+        (*                                                              *)
+        (*        Started:        11 September 2008                     *)
+        (*        Last edited:    18 September 2008                     *)
+        (*        Status:         OK                                    *)
+        (*                                                              *)
+        (****************************************************************)
+
+
+FROM SYSTEM IMPORT CARD8;
+
+TYPE
+    RecordKind = CARD8[0..4];
+
+    ListPtr = POINTER TO ListRecord;
+    ListRecord = RECORD
+                     previous, next: ListPtr;
+                     allow: BOOLEAN;
+                     CASE type: RecordKind OF
+                       |  0:  (* end record, no detail needed *)
+                       |  1:  (* address and mask *)
+                              address, mask: CARDINAL;
+                       |  2:  (* single address *)
+                              address2, dummy: CARDINAL;
+                       |  3:  (* address and bit count *)
+                              address3, bitcount: CARDINAL;
+                       |  4:  (* range *)
+                              firstaddr, lastaddr: CARDINAL;
+                     END (*CASE*);
+                 END (*RECORD*);
+
+
+PROCEDURE CardinalToDotted (value: CARDINAL;  VAR (*OUT*) text: ARRAY OF CHAR);
+
+    (* Converts the value to a string of the form a.b.c.d    *)
+
+PROCEDURE AddrRecordToText (p: ListPtr;  VAR (*OUT*) text: ARRAY OF CHAR);
+
+    (* Converts p^ to a text string. *)
+
+PROCEDURE StringToIPAddress (text: ARRAY OF CHAR): CARDINAL;
+
+    (* Converts an IP address. *)
+
+PROCEDURE LoadIPFilterList (appname: ARRAY OF CHAR): ListPtr;
+
+    (* Loads an allow/deny list from the INI file.    *)
+
+PROCEDURE StoreIPFilterList (appname: ARRAY OF CHAR;  head: ListPtr);
+
+    (* Stores an allow/deny list to the INI file.  We assume that the   *)
+    (* caller already has the INI file open.                            *)
+
+END IPFilters.
+

@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE FDUsers;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            30 August 1997                  *)
-        (*  Last edited:        25 June 2014                    *)
+        (*  Last edited:        18 June 2015                    *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (********************************************************)
@@ -114,7 +114,7 @@ FROM WildCard IMPORT
     (* proc *)  WildMatch;
 
 FROM Names IMPORT
-    (* type *)  UserName, PassString;
+    (* type *)  PassString, HostName;
 
 (********************************************************************************)
 
@@ -123,6 +123,7 @@ CONST Nul = CHR(0);
 TYPE
     CharSet = SET OF CHAR;
     FileNameString = ARRAY [0..255] OF CHAR;
+    UserName = FileNameString;
 
     (* The following declarations relate to the data structure that we keep,    *)
     (* for a logged-in user, to show which directories and files are accessible.*)
@@ -195,7 +196,8 @@ TYPE
                   END (*RECORD*);
 
     (* The fields in a UserPermission record have the following meanings.       *)
-    (*      Name         The user's login name                                  *)
+    (*      Name         The user's login name, which can be a plain username   *)
+    (*                       or possibly a name of the form user@domain         *)
     (*      Password     The user's password                                    *)
     (*      EncryptPassword   TRUE iff the password is stored in encrypted form *)
     (*      UserNumber   A serial number to use in welcome messages.            *)
@@ -378,7 +380,7 @@ PROCEDURE CategoriseNode (p: DirEntryPtr;  parentpath: ARRAY OF CHAR);
 (*                                PARSER                                        *)
 (********************************************************************************)
 
-PROCEDURE ReadUserData (name: ARRAY OF CHAR;
+PROCEDURE LoadUserData (name: ARRAY OF CHAR;
                           VAR (*OUT*) SpeedLimit: CARDINAL;
                           VAR (*OUT*) UpSpeedLimit: CARDINAL;
                           VAR (*OUT*) UpSizeLimit: CARD64;
@@ -675,7 +677,7 @@ PROCEDURE ReadUserData (name: ARRAY OF CHAR;
         END LoadHideList;
 
     (************************************************************************)
-    (*                     BODY OF READUSERDATA                             *)
+    (*                     BODY OF LOADUSERDATA                             *)
     (*                                                                      *)
     (*     <result>  ->  <userclass> <password> { <volumeinfo> }*           *)
     (*     <userclass> -> G | U | N | M | T                                 *)
@@ -691,7 +693,7 @@ PROCEDURE ReadUserData (name: ARRAY OF CHAR;
         SingleUse, DeleteExpired, UseTemplate, SuppressLog: BOOLEAN;
         App: UserName;   key: ARRAY [0..6] OF CHAR;
 
-    BEGIN       (* Body of ReadUserData *)
+    BEGIN       (* Body of LoadUserData *)
 
         LoginLimit := 0;
         SingleUse := FALSE;  SuppressLog := FALSE;  DeleteExpired := FALSE;
@@ -701,7 +703,7 @@ PROCEDURE ReadUserData (name: ARRAY OF CHAR;
 
         (* Read the user category and password from the INI file. *)
 
-        hini := OpenINIForUser(name);
+        hini := OpenINIForUser(name, FALSE);
         IF IsActiveUser (hini, result^.Name)
                 AND INIGet (hini, result^.Name, "Category", category)
                 AND (category <= Manager) THEN
@@ -882,6 +884,72 @@ PROCEDURE ReadUserData (name: ARRAY OF CHAR;
 
         RETURN result;
 
+    END LoadUserData;
+
+(********************************************************************************)
+
+PROCEDURE ReadUserData (name: ARRAY OF CHAR;
+                          VAR (*IN*)  host: ARRAY OF CHAR;
+                          VAR (*OUT*) SpeedLimit: CARDINAL;
+                          VAR (*OUT*) UpSpeedLimit: CARDINAL;
+                          VAR (*OUT*) UpSizeLimit: CARD64;
+                          VAR (*OUT*) category: UserCategory;
+                          VAR (*OUT*) LogSession: BOOLEAN): User;
+
+    (* Fetches the password, etc., for the user whose username is specified     *)
+    (* as the argument.  Returns with category = NoSuchUser if the user's data  *)
+    (* could not be found or if this is a user category that does not permit    *)
+    (* logging in.  The result is NIL in this case, and also in the             *)
+    (* case of an overflow user.                                                *)
+
+    VAR result: User;
+
+    (****************************************************************************)
+
+    PROCEDURE Try (thisname: ARRAY OF CHAR);
+
+        BEGIN
+            result := LoadUserData (thisname, SpeedLimit, UpSpeedLimit,
+                                         UpSizeLimit, category, LogSession);
+        END Try;
+
+    (****************************************************************************)
+
+    VAR username, guess: UserName;
+        domain: HostName;
+        pos: CARDINAL;  found: BOOLEAN;
+
+    BEGIN
+        Strings.Assign (name, username);
+        Strings.Assign (host, domain);
+        result := NIL;
+
+        (* If name contains an '@', the part after the '@' overrides the host.  *)
+
+        Strings.FindNext ('@', username, 0, found, pos);
+        IF found THEN
+            Strings.Assign (username, domain);
+            Strings.Delete (domain, 0, pos+1);
+            username[pos] := Nul;
+        END (*IF*);
+
+        IF domain[0] <> Nul THEN
+
+            (* First look for the user@host form, and if that fails then        *)
+            (* revert back to the name as supplied.                             *)
+
+            Strings.Assign (username, guess);
+            Strings.Append ("@", guess);
+            Strings.Append (domain, guess);
+            Try (guess);
+        END (*IF*);
+
+        IF result = NIL THEN
+            Try (username);
+        END (*IF*);
+
+        RETURN result;
+
     END ReadUserData;
 
 (********************************************************************************)
@@ -939,7 +1007,7 @@ PROCEDURE NoteLoginTime (U: User);
 
     BEGIN
         CurrentTimeToString (timestamp);
-        hini := OpenINIForUser (U^.Name);
+        hini := OpenINIForUser (U^.Name, FALSE);
         IF INIValid(hini) THEN
             INIPut (hini, U^.Name, "LastLogin", timestamp);
             CloseINIFile (hini);

@@ -7,7 +7,7 @@ DEFINITION MODULE FtpdINI;
         (*   The actual INI file operations are done by RINIData    *)
         (*                                                          *)
         (*      Started:        28 January 2002                     *)
-        (*      Last edited:    21 November 2009                    *)
+        (*      Last edited:    5 February 2015                     *)
         (*      Status:         OK                                  *)
         (*                                                          *)
         (************************************************************)
@@ -43,7 +43,8 @@ PROCEDURE SetHashMax (value: CARDINAL);
     (* of using a single INI file.  Otherwise, it is recommended that   *)
     (* value be a prime number.                                         *)
 
-PROCEDURE OpenINIForUser (name: ARRAY OF CHAR): HINI;
+PROCEDURE OpenINIForUser (name: ARRAY OF CHAR;
+                                CreateIfNotExists: BOOLEAN): HINI;
 
     (* Opens the INI file that contains the data for the named user. *)
 

@@ -1,0 +1,41 @@
+DEFINITION MODULE VStrings;
+
+        (********************************************************)
+        (*                                                      *)
+        (*  Storage manager for dynamically allocated strings.  *)
+        (*                                                      *)
+        (*  Using VStrings instead of normal character strings  *)
+        (*  can produce a significant space saving, but it does *)
+        (*  place an obligation on the caller to deallocate     *)
+        (*  the strings when they are no longer needed, to      *)
+        (*  avoid leaving orphans in the heap.                  *)
+        (*                                                      *)
+        (*  Programmer:         P. Moylan                       *)
+        (*  Last edited:        28 November 2014                *)
+        (*  Status:             OK                              *)
+        (*                                                      *)
+        (********************************************************)
+
+
+TYPE VString;   (* is private *)
+
+
+PROCEDURE MakeVString (VAR (*IN*) source: ARRAY OF CHAR): VString;
+
+    (* Converts an array to a VString.  The source array is not altered.*)
+
+PROCEDURE DiscardVString (VAR (*INOUT*) VS: VString);
+
+    (* Deallocates the storage for VS, returns with VS = NIL. *)
+
+PROCEDURE VSCompare (VAR (*IN*) first, second: VString): INTEGER;
+
+    (* Compares two strings, ignoring alphabetic case.   Returns        *)
+    (* -1 if first < second, 0 if first = second, +1 if first > second. *)
+
+PROCEDURE WriteVString (VS: VString);
+
+    (* Writes a string to standard output. *)
+
+END VStrings.
+

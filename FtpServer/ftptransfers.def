@@ -1,0 +1,349 @@
+DEFINITION MODULE FtpTransfers;
+
+        (********************************************************)
+        (*                                                      *)
+        (*          FTP server user database handler            *)
+        (*                                                      *)
+        (*  Programmer:         P. Moylan                       *)
+        (*  Started:            24 August 1997                  *)
+        (*  Last edited:        16 June 2015                    *)
+        (*  Status:             OK                              *)
+        (*                                                      *)
+        (********************************************************)
+
+
+FROM SYSTEM     IMPORT (*TYPE*) CARD16;
+FROM Types      IMPORT (*TYPE*) CARD64;
+FROM FDUsers    IMPORT (*TYPE*) UserCategory;
+FROM TransLog   IMPORT (*TYPE*) TransactionLogID;
+FROM Sockets    IMPORT (*TYPE*) Socket, SockAddr;
+FROM Semaphores IMPORT (*TYPE*) Semaphore;
+FROM Names      IMPORT (*TYPE*) FilenameString;
+
+
+TYPE ClientFileInfo;            (* IS PRIVATE *)
+
+
+PROCEDURE VersionIs (v: ARRAY OF CHAR);
+
+    (* Stores the version number. *)
+
+PROCEDURE NotifyMaxUsers (limit: CARDINAL);
+
+    (* Global limit on number of simultaneous users. *)
+
+PROCEDURE EnableTaggedCheck (enable: BOOLEAN);
+
+    (* Enables or disables special action on 'tagged' directories. *)
+
+PROCEDURE SetLogLevel (option, level: CARDINAL;
+                       VAR (*IN*) CommonLogName, UserLogName: FilenameString);
+
+    (* Sets the amount of logging we want.  The first parameter says    *)
+    (* what kind of log:                                                *)
+    (*       0          no log                                          *)
+    (*       1          user log                                        *)
+    (*       2          common.log                                      *)
+    (*       3          both user log and common.log                    *)
+    (* The second parameter says how much detail to log.                *)
+
+PROCEDURE SetFreeSpaceThreshold (kilobytes: CARDINAL);
+
+    (* The amount of space that must be unused on a drive before a      *)
+    (* client can write to that drive.                                  *)
+
+PROCEDURE SetPassivePortRange (limit: BOOLEAN;  portmin, portmax: CARD16);
+
+    (* If limit is TRUE, then portmin and portmax are the minimum and   *)
+    (* maximum port values, respectively, that are permitted for        *)
+    (* passive ftp.  If limit is FALSE, we let the tcp/ip stack choose  *)
+    (* a port for us.                                                   *)
+
+PROCEDURE SetBehindFirewall (enable: BOOLEAN;
+                            MinLocalAddr, MaxLocalAddr, IPAddr: CARDINAL);
+
+    (* If enable is TRUE, then IPAddr is the address that we report in  *)
+    (* the PASV response.  Exception: if the client address is in the   *)
+    (* range MinLocalAddr to MaxLocalAddr, inclusive, the "behind       *)
+    (* firewall" rules are not applied.  The three numeric values are   *)
+    (* in network byte order.                                           *)
+    (* If enable is FALSE, the numeric parameters have no effect.       *)
+
+PROCEDURE CreateSession (S: Socket;  UserNumber: CARDINAL;
+                               LogID: TransactionLogID;
+                               KeepAlive: Semaphore): ClientFileInfo;
+
+    (* Creates a new session state record.  During lengthy operations   *)
+    (* we have to do a Signal(KeepAlive) every so often in order to     *)
+    (* stop the session from timing out.                                *)
+
+PROCEDURE SetHost (SS: ClientFileInfo;  hostname: ARRAY OF CHAR): BOOLEAN;
+
+    (* Sets the "domain" name as supplied by a HOST command. *)
+
+PROCEDURE RecordLoginTime (SS: ClientFileInfo);
+
+    (* Puts the current date/time as the "last login time" for this user.       *)
+
+PROCEDURE CloseUser (SS: ClientFileInfo);
+
+    (* Returns the user to a "not logged in" state.  The session remains open. *)
+
+PROCEDURE SendUserStatus (SS: ClientFileInfo);
+
+    (* Sends a reply to the STAT command. *)
+
+PROCEDURE KillDataChannel (SS: ClientFileInfo);
+
+    (* Aborts the data transfer, if any, now in progress for this session. *)
+
+PROCEDURE CloseSocket (S: Socket;  LogID: TransactionLogID);
+
+    (* Closes socket S, logs an error message if the close fails. *)
+
+PROCEDURE CloseSession (VAR (*INOUT*) SS: ClientFileInfo);
+
+    (* Destroys SS. *)
+
+PROCEDURE GetUserName (SS: ClientFileInfo;  VAR (*OUT*) Name: ARRAY OF CHAR);
+
+    (* Returns the user name (the one we use for logging).  *)
+
+PROCEDURE FindUser (Name: ARRAY OF CHAR;
+                     VAR (*INOUT*) SessionInfo: ClientFileInfo;
+                     VAR (*OUT*) category: UserCategory;
+                     VAR (*OUT*) LogSession: BOOLEAN);
+
+    (* Input: Name contains the argument of the  USER command.       *)
+    (* Output: Access permission data for that user.                 *)
+
+PROCEDURE PasswordOK (SS: ClientFileInfo;  VAR (*IN*) pass: ARRAY OF CHAR): BOOLEAN;
+
+    (* Tests for a password match. *)
+
+PROCEDURE SendMessageFile (S: Socket;  filename, prefix: ARRAY OF CHAR;
+                                       UserNumber: CARDINAL;  SS: ClientFileInfo;
+                                       RelativeInclude: BOOLEAN);
+
+    (* Sends the contents of a text file to socket S.  Each line has "prefix-"  *)
+    (* prepended to it, and there is also some macro expansion of % macro codes *)
+    (* in the file.  If the file can't be opened, nothing is sent.              *)
+
+    (* RelativeInclude = TRUE means that filename arguments in a %i macro must  *)
+    (* be specified in the client's view of the file system, and the client     *)
+    (* must have read permission for the file.                                  *)
+
+PROCEDURE SendDirectoryMessage (SS: ClientFileInfo;  prefix: ARRAY OF CHAR);
+
+    (* Sends the user a copy of Dir.MSG, if it exists in the user's     *)
+    (* current directory and the user hasn't already seen it.           *)
+
+PROCEDURE UnacceptablePort (SS: ClientFileInfo;  IPaddr, port: CARDINAL): BOOLEAN;
+
+    (* Returns TRUE if the port number is too low, or the user is a guest  *)
+    (* user attempting to do a three-cornered transfer.  The IPaddr and    *)
+    (* port arguments are in network byte order.                           *)
+
+PROCEDURE SetPort (SS: ClientFileInfo;  IPaddr: CARDINAL;  port: CARDINAL);
+
+    (* Sets the client address for future data transfers. *)
+
+PROCEDURE SetTransferType (SS: ClientFileInfo;  option: CHAR);
+
+    (* Sets transfer type to 'A'=ASCII or 'I'=Image or 'U'=UNICODE.  *)
+
+PROCEDURE SetTransferMode (SS: ClientFileInfo;  option: CHAR);
+
+    (* Sets transfer mode to 'S'=stream or (others not implemented). *)
+
+PROCEDURE EnterPassiveMode (SS: ClientFileInfo;  VAR (*OUT*) myaddr: SockAddr): BOOLEAN;
+
+    (* Creates a data socket, binds it to a local port, and then listens.       *)
+    (* On return myaddr holds the port details.                                 *)
+
+PROCEDURE SetFileStructure (SS: ClientFileInfo;  option: CHAR);
+
+    (* Sets file structure to 'F'=file or (others not implemented).  *)
+
+PROCEDURE GetCurrentPermissions (SS: ClientFileInfo;  VAR (*OUT*) result: ARRAY OF CHAR);
+
+    (* Returns a string indicating read/write/delete permissions for the        *)
+    (* user's current directory.                                                *)
+
+PROCEDURE CurrentDirectory (SS: ClientFileInfo;  VAR (*OUT*) DirString: ARRAY OF CHAR);
+
+    (* Gives back the name of the current directory for this user.  *)
+
+PROCEDURE RealCurrentDirectory (SS: ClientFileInfo;  VAR (*OUT*) DirString: ARRAY OF CHAR);
+
+    (* Gives back the name of the current directory for this user.  Note that   *)
+    (* the present procedure returns the directory name in the host file system *)
+    (* while CurrentDirectory returns a virtual directory name.                 *)
+
+PROCEDURE SetDirectory (SS: ClientFileInfo;  MessageEnabled: BOOLEAN;
+                                              DirString: ARRAY OF CHAR): BOOLEAN;
+
+    (* Changes user to the specified directory.  The pathname can be absolute   *)
+    (* (starting with '/') or relative to the current directory.  Returns FALSE *)
+    (* if the requested directory does not exist, or if the user does not       *)
+    (* have the right to see it.                                                *)
+    (* NameString is a UTF-8 file name.                                         *)
+
+PROCEDURE SetFileName (SS: ClientFileInfo;  NameString: ARRAY OF CHAR;
+                                                         InterpretFlags: BOOLEAN);
+
+    (* Specifies the name of the file that will next be involved in a data      *)
+    (* transfer for this user.  If InterpretFlags is TRUE, also detects some    *)
+    (* Unix-like arguments and sets SS^.flags.                                  *)
+    (* NameString is a UTF-8 file name.                                         *)
+
+PROCEDURE CreateUniqueFileName (SS: ClientFileInfo;
+                                 VAR (*OUT*) NameString: ARRAY OF CHAR): BOOLEAN;
+
+    (* Like SetFileName, except that we create the name internally, making      *)
+    (* sure that it's unique for the current directory.  The result is FALSE    *)
+    (* if we're not able to create the unique name.                             *)
+
+PROCEDURE SetRestartPoint (SS: ClientFileInfo;  marker: ARRAY OF CHAR);
+
+    (* Sets a restart marker for a subsequent RETR or STOR operation.  *)
+
+PROCEDURE AllocateFileSize (SS: ClientFileInfo;  amount: ARRAY OF CHAR): BOOLEAN;
+
+    (* Sets the file size for a subsequent STOR or APPE.  Returns FALSE if      *)
+    (* the requested file size is too big.                                      *)
+
+PROCEDURE ListingIsPossible (SS: ClientFileInfo): BOOLEAN;
+
+    (* Returns TRUE iff this user is allowed to see a listing of the file(s)    *)
+    (* specified in the last SetFileName call.                                  *)
+
+PROCEDURE GetFileDate (SS: ClientFileInfo;  VAR (*OUT*) result: ARRAY OF CHAR);
+
+    (* Returns the date/time of the file's directory entry, in a string of the  *)
+    (* form "yyyymmddhhmmss" (exactly 14 characters).  If the file is not       *)
+    (* accessible, the result is the null string.                               *)
+
+PROCEDURE SetFileDateTime (SS: ClientFileInfo;  datetime: ARRAY OF CARDINAL);
+
+    (* Sets the modified/accessed/created timestamps for the currently selected *)
+    (* file, from an array of 6 numbers already encoded into the format the     *)
+    (* filesystem uses for timestamps.                                          *)
+
+PROCEDURE GetSize (SS: ClientFileInfo): CARD64;
+
+    (* Returns the size in bytes of the file specified in SetFileName.  If the  *)
+    (* file is not accessible, the result is returned as Max64.                 *)
+
+PROCEDURE GetSizeTypeAndName (SS: ClientFileInfo;  VAR (*OUT*) size: CARD64;
+                              VAR (*OUT*) IsASCII: BOOLEAN;
+                              VAR (*OUT*) name: ARRAY OF CHAR);
+
+    (* Returns the size and name of the currently chosen file, and a flag       *)
+    (* to say whether the transfer type is ASCII.  We've already confirmed      *)
+    (* that the caller is allowed to have this information.                     *)
+
+PROCEDURE GetSizeTypeAndNameU (SS: ClientFileInfo;  VAR (*OUT*) size: CARD64;
+                              VAR (*OUT*) IsASCII: BOOLEAN;
+                              VAR (*OUT*) name: ARRAY OF CHAR);
+
+    (* Returns the size and UTF-8 name of the currently chosen file, and a flag *)
+    (* to say whether the transfer type is ASCII.  We've already confirmed      *)
+    (* that the caller is allowed to have this information.                     *)
+
+PROCEDURE AmountTransferred (SS: ClientFileInfo;  VAR (*OUT*) amount, total: CARD64);
+
+    (* Reports back the number of bytes transferred, and the total number       *)
+    (* of bytes in the file, for the current transfer.                          *)
+
+PROCEDURE ResetCount (SS: ClientFileInfo);
+
+    (* Set the byte count back to zero. *)
+
+PROCEDURE SendDirectory (SS: ClientFileInfo;  UseControlConnection: BOOLEAN;
+                                              ShowAllDetails: BOOLEAN): BOOLEAN;
+
+    (* Sends a directory listing as specified by the last SetFileName call.     *)
+    (* Sends it via the control socket if UseControlConnection is TRUE, and via *)
+    (* the data connection otherwise.                                           *)
+    (* Returns TRUE iff the transfer was successful.                            *)
+    (* Returned file names are in UTF-8 encoding.                               *)
+
+PROCEDURE CloseDataPort (SS: ClientFileInfo);
+
+    (* Closes the data port used by this client, if it was still open. *)
+
+PROCEDURE FileAvailable (SS: ClientFileInfo): BOOLEAN;
+
+    (* Returns TRUE iff the file exists and the user is allowed to read it.  *)
+
+PROCEDURE IsDirectory (SS: ClientFileInfo): BOOLEAN;
+
+    (* Returns TRUE iff the name specified in the last SetFileName refers to    *)
+    (* a directory, rather than to a file.  There are no guarantees in the      *)
+    (* case where the name is inaccessible for any reason.                      *)
+
+PROCEDURE FileOrDirectoryVisible (SS: ClientFileInfo): BOOLEAN;
+
+    (* Returns TRUE iff the file or directory exists and is visible. *)
+
+PROCEDURE CanWrite (SS: ClientFileInfo;  CheckExists: BOOLEAN;
+                                   VAR (*OUT*) HavePermission: BOOLEAN): BOOLEAN;
+
+    (* Returns TRUE iff user can write the file whose name was last set.  If    *)
+    (* CheckExists is TRUE and the file already exists, we must also have       *)
+    (* permission to delete the old file of that name.  Exception: if the       *)
+    (* restart point is nonzero then we don't need the delete permission.       *)
+    (* Special case: returning with HavePermission = TRUE but a function result *)
+    (* of FALSE means that we would have had permission to write the file but   *)
+    (* have run out of disk space.                                              *)
+
+PROCEDURE CanDelete (SS: ClientFileInfo): BOOLEAN;
+
+    (* Returns TRUE iff user can delete the file whose name was last set.  *)
+
+PROCEDURE CanRemoveDirectory (SS: ClientFileInfo): BOOLEAN;
+
+    (* Returns TRUE iff user can delete the directory whose name was last set.  *)
+
+PROCEDURE SendFile (SS: ClientFileInfo): BOOLEAN;
+
+    (* Sends the file whose name was specified by the last SetFileName call to  *)
+    (* the client.  Returns TRUE iff the transfer was successful.               *)
+
+PROCEDURE AcceptFile (SS: ClientFileInfo;  VAR (*OUT*) SizeTooBig: BOOLEAN): BOOLEAN;
+
+    (* Reads the file whose name was specified by the last SetFileName call     *)
+    (* from the client.  Returns TRUE for a successful transfer.                *)
+    (* Convention (and I hope I get it right this time): if file already exists *)
+    (* then we first delete the old file iff the restart point is zero.  In     *)
+    (* this case the caller will have already have checked that the user has    *)
+    (* delete permission for the file.                                          *)
+
+PROCEDURE AppendFile (SS: ClientFileInfo;  VAR (*OUT*) SizeTooBig: BOOLEAN): BOOLEAN;
+
+    (* Like AcceptFile, except that if the file already exists then the new     *)
+    (* data are appended to the end of the file.                                *)
+
+PROCEDURE DeleteFile (SS: ClientFileInfo): BOOLEAN;
+
+    (* Deletes the file whose name was specified by the last SetFileName call   *)
+    (* from the client.  Returns TRUE for a successful deletion.                *)
+
+PROCEDURE MakeDirectory (SS: ClientFileInfo): BOOLEAN;
+
+    (* Creates a directory as specified by the last SetFileName call.  Returns  *)
+    (* TRUE for a successful operation.                                         *)
+
+PROCEDURE DeleteDirectory (SS: ClientFileInfo): BOOLEAN;
+
+    (* Deletes the directory whose name was specified by the last SetFileName   *)
+    (* call from the client.  Returns TRUE for a successful deletion.           *)
+
+PROCEDURE RenameTo (SS: ClientFileInfo;  NewName: ARRAY OF CHAR): BOOLEAN;
+
+    (* Renames to NewName the file or directory whose name was specified by the *)
+    (* last SetFileName call from the client.  Returns TRUE for success.        *)
+
+END FtpTransfers.
+

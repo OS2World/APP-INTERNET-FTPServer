@@ -28,7 +28,7 @@ MODULE Ftpd;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            19 August 1997                  *)
-        (*  Last edited:        27 March 2014                   *)
+        (*  Last edited:        5 February 2015                 *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (********************************************************)
@@ -632,7 +632,7 @@ PROCEDURE RunTheServer;
             IF ScreenEnabled THEN
                 ClearScreen;  SetBoundary (2, 30);
                 UpdateTopScreenLine (0, LogLine);
-                UpdateTopScreenLine (20, "Copyright (C) 1998-2014 Peter Moylan");
+                UpdateTopScreenLine (20, "Copyright (C) 1998-2015 Peter Moylan");
                 UpdateTopScreenLine (62, "Users: 0");
 
                 WriteString ("Listening on ");

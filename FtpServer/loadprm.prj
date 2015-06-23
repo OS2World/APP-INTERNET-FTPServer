@@ -1,3 +1,4 @@
+-multithread+
 -INCL_DOS:+
 -INCL_DOSERRORS:+
 -INCL_SUB:+
@@ -8,4 +9,6 @@
 -TRACKTNIUSAGE:-
 
 !module LoadPRM
+!module SO32DLL.lib
+!module TCP32DLL.lib
 

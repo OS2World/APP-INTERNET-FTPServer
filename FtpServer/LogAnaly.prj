@@ -1,6 +1,13 @@
+-multithread+
 - GENDEBUG +
 - LINENO +
 - GENHISTORY +
 
-!module LogAnalysis
+% Set heap size to be 64 less than a multiple of 2^16.
+% In this case 24 MB minus 64 bytes.
+
+- HEAPLIMIT=   17FFFC0H
+- GCTHRESHOLD= 17FFFC0H
+
+!module LogAnaly
 
