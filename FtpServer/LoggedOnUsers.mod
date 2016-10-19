@@ -403,10 +403,6 @@ PROCEDURE NewUser (client: ClientDataPointer;
     (* is not currently a logged-in user.  This procedure produces an updated   *)
     (* session state that reflects the Username.                                *)
 
-    (* We assume that a session has already been established, but that there    *)
-    (* is not currently a logged-in user.  This procedure produces an updated   *)
-    (* session state that reflects the Username.                                *)
-
     VAR category: UserCategory;
 
     BEGIN

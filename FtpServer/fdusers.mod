@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  FtpServer FTP daemon                                                  *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2016   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE FDUsers;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            30 August 1997                  *)
-        (*  Last edited:        18 June 2015                    *)
+        (*  Last edited:        17 August 2016                  *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (********************************************************)
@@ -69,6 +69,10 @@ FROM LowLevel IMPORT
 FROM TaskControl IMPORT
     (* type *)  Lock,
     (* proc *)  CreateLock, Obtain, Release;
+
+FROM Semaphores IMPORT
+    (* type *)  Semaphore,
+    (* proc *)  Signal;
 
 FROM FileOps IMPORT
     (* const*)  NoSuchChannel,
@@ -689,14 +693,12 @@ PROCEDURE LoadUserData (name: ARRAY OF CHAR;
     (************************************************************************)
 
     VAR result: User;  root: DirEntryPtr;
-        LoginLimit: CARDINAL;
-        SingleUse, DeleteExpired, UseTemplate, SuppressLog: BOOLEAN;
+        UseTemplate, SuppressLog: BOOLEAN;
         App: UserName;   key: ARRAY [0..6] OF CHAR;
 
     BEGIN       (* Body of LoadUserData *)
 
-        LoginLimit := 0;
-        SingleUse := FALSE;  SuppressLog := FALSE;  DeleteExpired := FALSE;
+        SuppressLog := FALSE;
         NEW (result);
         Strings.Assign (name, result^.Name);
         result^.TreeRoot := NIL;  result^.PosInTree := NIL;  result^.HideList := NIL;
@@ -717,20 +719,6 @@ PROCEDURE LoadUserData (name: ARRAY OF CHAR;
             END (*IF*);
             IF (category < NormalUser) OR NOT INIGet (hini, result^.Name, "EncryptPassword", result^.EncryptPassword) THEN
                 result^.EncryptPassword := FALSE;
-            END (*IF*);
-
-            (* Limited-use account? *)
-
-            IF INIGet (hini, result^.Name, "SingleUse", SingleUse) THEN
-                (* Obsolete option *)
-                IF SingleUse THEN
-                    LoginLimit := 1;
-                END (*IF*);
-                INIDeleteKey (hini, result^.Name, "SingleUse");
-            ELSE EVAL (INIGet(hini, result^.Name, "LoginLimit", LoginLimit));
-            END (*IF*);
-            IF NOT INIGet (hini, result^.Name, "DeleteExpired", DeleteExpired) THEN
-                DeleteExpired := FALSE;
             END (*IF*);
 
             (* Suppress logging for this user? *)
@@ -824,27 +812,6 @@ PROCEDURE LoadUserData (name: ARRAY OF CHAR;
 
             root^.FirstChild := DirList (root, "");
             result^.CurrentVDir := '/';
-
-            (* If this is a 'limited logins' account, decrement the     *)
-            (* number of logins allowed.  If the count reaches zero,    *)
-            (* keep the user data in memory but either delete it from   *)
-            (* the INI data or make the account inactive, depending on  *)
-            (* the DeletedExpired flag in the INI file.                 *)
-            (*       Note: LoginLimit=0 means no limit.                 *)
-
-            IF LoginLimit > 0 THEN
-                DEC (LoginLimit);
-                IF LoginLimit = 0 THEN
-                    IF DeleteExpired THEN
-                        INIDeleteApp (hini, result^.Name);
-                    ELSE
-                        Active := FALSE;
-                        INIPut (hini, result^.Name, "Active", Active);
-                    END (*IF*);
-                ELSE
-                    INIPut (hini, result^.Name, "LoginLimit", LoginLimit);
-                END (*IF*);
-            END (*IF*);
 
             (* Discard the INI file raw data. *)
 
@@ -983,6 +950,56 @@ PROCEDURE PasswordAcceptable (U: User;  VAR (*IN*) pass: ARRAY OF CHAR): BOOLEAN
 
 (********************************************************************************)
 
+PROCEDURE CheckLimitedUse (hini: HINI;  VAR (*IN*) name: UserName);
+
+    (* Checks whether this is a limited-use account, and takes appropriate      *)
+    (* action if so. This procedure should be called after the user has been    *)
+    (* authenticated, i.e. once we are certain that this is a genuine login.    *)
+
+    VAR LoginLimit: CARDINAL;
+        SingleUse, DeleteExpired: BOOLEAN;
+
+    BEGIN
+        LoginLimit := 0;
+
+        (* Limited-use account? *)
+
+        IF INIGet (hini, name, "SingleUse", SingleUse) THEN
+            (* Obsolete option *)
+            IF SingleUse THEN
+                LoginLimit := 1;
+            END (*IF*);
+            INIDeleteKey (hini, name, "SingleUse");
+        ELSE EVAL (INIGet(hini, name, "LoginLimit", LoginLimit));
+        END (*IF*);
+        IF NOT INIGet (hini, name, "DeleteExpired", DeleteExpired) THEN
+            DeleteExpired := FALSE;
+        END (*IF*);
+
+        (* If this is a 'limited logins' account, decrement the     *)
+        (* number of logins allowed.  If the count reaches zero,    *)
+        (* keep the user data in memory but either delete it from   *)
+        (* the INI data or make the account inactive, depending on  *)
+        (* the DeletedExpired flag in the INI file.                 *)
+        (*       Note: LoginLimit=0 means no limit.                 *)
+
+        IF LoginLimit > 0 THEN
+            DEC (LoginLimit);
+            IF LoginLimit = 0 THEN
+                IF DeleteExpired THEN
+                    INIDeleteApp (hini, name);
+                ELSE
+                    INIPut (hini, name, "Active", FALSE);
+                END (*IF*);
+            ELSE
+                INIPut (hini, name, "LoginLimit", LoginLimit);
+            END (*IF*);
+        END (*IF*);
+
+    END CheckLimitedUse;
+
+(********************************************************************************)
+
 PROCEDURE GetUserNumber (U: User;  VAR (*OUT*) UserNumber, Limit: CARDINAL);
 
     (* Returns the user number and user limit, within the category defined by   *)
@@ -1001,7 +1018,9 @@ PROCEDURE GetUserNumber (U: User;  VAR (*OUT*) UserNumber, Limit: CARDINAL);
 
 PROCEDURE NoteLoginTime (U: User);
 
-    (* Puts the current date/time as the "last login time" for this user.       *)
+    (* Puts the current date/time as the "last login time" for this user.  This *)
+    (* is also the point at which we check whether this is a limited-use        *)
+    (* account.                                                                 *)
 
     VAR hini: HINI;  timestamp: ARRAY [0..18] OF CHAR;
 
@@ -1010,6 +1029,7 @@ PROCEDURE NoteLoginTime (U: User);
         hini := OpenINIForUser (U^.Name, FALSE);
         IF INIValid(hini) THEN
             INIPut (hini, U^.Name, "LastLogin", timestamp);
+            CheckLimitedUse (hini, U^.Name);
             CloseINIFile (hini);
         END (*IF*);
     END NoteLoginTime;
@@ -1974,13 +1994,33 @@ PROCEDURE SetWorkingDirectory (U: User;  newdir: FName): BOOLEAN;
     (* Changes user to the specified directory.  Returns FALSE if the requested    *)
     (* directory does not exist, or if the user does not have the right to see it. *)
 
-    VAR success: BOOLEAN;
+    VAR k: CARDINAL;  success: BOOLEAN;
+        head, vdir: FileNameString;
 
     BEGIN
         success := (newdir <> NIL) AND (newdir^.fname[0] = Nul)
                            AND (newdir^.EntryPtr <> NIL)
                            AND newdir^.EntryPtr^.IsADir
                            AND (Visible IN newdir^.EntryPtr^.flags);
+        IF success THEN
+            (* Check the HideList. *)
+
+            vdir := newdir^.vdir;
+
+            (* vdir usually ends with a '/', which we want to remove    *)
+            (* for this test.                                           *)
+
+            k := LENGTH(vdir);
+            IF k > 0 THEN
+                DEC(k);
+                IF vdir[k] = '/' THEN
+                    vdir[k] := Nul;
+                END (*IF*);
+            END (*IF*);
+            SplitTail (vdir, head);
+            success := NOT InHideList(U, vdir);
+        END (*IF*);
+
         IF success THEN
             WITH U^ DO
                 PosInTree := newdir^.EntryPtr;
@@ -2136,8 +2176,8 @@ TYPE
 
 (********************************************************************************)
 
-PROCEDURE SendTheListing (S: Socket;  U: User;  VAR (*INOUT*) p: ListOfItems;
-                                                      options: ListingOptions);
+PROCEDURE SendTheListing (S: Socket;  U: User;  KeepAlive: Semaphore;
+                          VAR (*INOUT*) p: ListOfItems;  options: ListingOptions);
 
     (* Sends a directory listing to socket S, where p points to a list of the   *)
     (* entries we want to send.  On return the list has been discarded.         *)
@@ -2183,6 +2223,7 @@ PROCEDURE SendTheListing (S: Socket;  U: User;  VAR (*INOUT*) p: ListOfItems;
             temp := p;  p := p^.next;
             DISPOSE(temp);
         END (*WHILE*);
+        Signal (KeepAlive);
 
     END SendTheListing;
 
@@ -2231,9 +2272,9 @@ PROCEDURE AddItemToList (VAR (*INOUT*) head: ListOfItems;  D: DirectoryEntry;
 
 (********************************************************************************)
 
-PROCEDURE ListRealDirectory (S: Socket;  U: User;  arg: FName;
-                             options: ListingOptions;
-                             VAR (*INOUT*) sublist: ListOfDirectories);
+PROCEDURE ListRealDirectory (S: Socket;  U: User;  KeepAlive: Semaphore;
+                                arg: FName;  options: ListingOptions;
+                                VAR (*INOUT*) sublist: ListOfDirectories);
 
     (* Sends a directory listing, as specified by arg.  If the options include  *)
     (* recursing over subdirectories then sublist will be updated.              *)
@@ -2241,7 +2282,7 @@ PROCEDURE ListRealDirectory (S: Socket;  U: User;  arg: FName;
     (* and arg use file names in the native character set; translation to       *)
     (* UTF-8 does not occur until the actual sending.                           *)
 
-    CONST ListSizeLimit = 50;
+    CONST ListSizeLimit = 200;
 
     VAR head: ListOfItems;
         D: DirectoryEntry;
@@ -2334,7 +2375,7 @@ PROCEDURE ListRealDirectory (S: Socket;  U: User;  arg: FName;
             IF SendIt THEN
                 INC (ListSize);
                 IF ListSize >= ListSizeLimit THEN
-                    SendTheListing (S, U, head, options);
+                    SendTheListing (S, U, KeepAlive, head, options);
                     ListSize := 0;
                 END (*IF*);
             END (*IF*);
@@ -2512,14 +2553,14 @@ PROCEDURE ListRealDirectory (S: Socket;  U: User;  arg: FName;
 
         (* We've put together the list, now send it to the client. *)
 
-        SendTheListing (S, U, head, options);
+        SendTheListing (S, U, KeepAlive, head, options);
 
     END ListRealDirectory;
 
 (********************************************************************************)
 
-PROCEDURE ListDirectory (S: Socket;  U: User;  VAR (*INOUT*) arg: FName;
-                                       options: ListingOptions);
+PROCEDURE ListDirectory (S: Socket;  U: User;  KeepAlive: Semaphore;
+                            VAR (*INOUT*) arg: FName;  options: ListingOptions);
 
     (* Sends a directory listing, as specified by arg and options.  On return   *)
     (* arg has been disposed of.  Parameter arg uses the native character set,  *)
@@ -2558,7 +2599,7 @@ PROCEDURE ListDirectory (S: Socket;  U: User;  VAR (*INOUT*) arg: FName;
                 (* Now the actual listing.  This might include adding new       *)
                 (* entries to ToDo as a side-effect.                            *)
 
-                ListRealDirectory (S, U, arg, options, ToDo);
+                ListRealDirectory (S, U, KeepAlive, arg, options, ToDo);
 
             END (*IF*);
             DISPOSE (arg);

@@ -85,7 +85,7 @@ mkdir tools
 
 /* Zip up the main package. */
 
-'zip -q -r ..\ftpser'ver'.zip .'
+'zip -q -r ..\ftpser_'ver'.zip .'
 'del doc\* /n'
 rmdir doc
 'del tools\* /n'
@@ -148,8 +148,8 @@ cd ..
 'del src3.zip /N'
 'cd ..'
 
-'del ..\ftpserSrc'ver'.zip /N 2>nul'
-'zip -q -r ..\ftpserSrc'ver'.zip .'
+'del ..\ftpserSrc_'ver'.zip /N 2>nul'
+'zip -q -r ..\ftpserSrc_'ver'.zip .'
 
 /* Remove temporary files. */
 

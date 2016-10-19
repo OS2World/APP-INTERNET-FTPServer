@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  FtpServer FTP daemon                                                  *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2016   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE FtpTransfers;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            24 August 1997                  *)
-        (*  Last edited:        16 June 2015                    *)
+        (*  Last edited:        16 August 2016                  *)
         (*  Status:             OK                              *)
         (*                                                      *)
         (********************************************************)
@@ -1856,7 +1856,7 @@ PROCEDURE SendDirectory (SS: ClientFileInfo;  UseControlConnection: BOOLEAN;
                     flags := flags + ListingOptions{ListDotDot, ShowDetails};
                 END (*IF*);
                 IF IsManager THEN INCL(flags, SystemAndHidden) END (*IF*);
-                ListDirectory (CommandSocket, SS^.user, iname, flags);
+                ListDirectory (CommandSocket, SS^.user, SS^.KickMe, iname, flags);
             END (*WITH*);
             RETURN TRUE;
         ELSIF OpenDataPort (SS) THEN
@@ -1865,7 +1865,7 @@ PROCEDURE SendDirectory (SS: ClientFileInfo;  UseControlConnection: BOOLEAN;
                     flags := flags + ListingOptions{ListDotDot, ShowDetails};
                 END (*IF*);
                 IF IsManager THEN INCL(flags, SystemAndHidden) END (*IF*);
-                ListDirectory (ClientPort.socket, SS^.user, iname, flags);
+                ListDirectory (ClientPort.socket, SS^.user, SS^.KickMe, iname, flags);
                 Synch (ClientPort.socket);
             END (*WITH*);
             RETURN TRUE;

@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Setup for FtpServer                                                   *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2015   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE HideList;
         (*          Dialogue to edit the HideList for one user          *)
         (*                                                              *)
         (*        Started:        27 May 2013                           *)
-        (*        Last edited:    1 June 2013                           *)
+        (*        Last edited:    20 December 2015                      *)
         (*        Status:         Working                               *)
         (*                                                              *)
         (****************************************************************)
@@ -64,10 +64,8 @@ VAR
 
     (* Current position in the list.  These are recalculated on each    *)
     (* entry to the dialogue procedure, because of the likelihood that  *)
-    (* the user has moved the listbox cursor.                           *)
-
-    (* So do they need to be global? Check this once other issues       *)
-    (* have been resolved.                                              *)
+    (* the user has moved the listbox cursor.  Nevertheless we keep     *)
+    (* the previous values so as to speed up the recalculation.         *)
 
     CurrentItem: ListPtr;
     CurrentIndex: INTEGER;
@@ -99,6 +97,7 @@ PROCEDURE LoadList (VAR (*IN*) username: ARRAY OF CHAR): ListPtr;
 
         BEGIN
             IF bufptr^[j] = Nul THEN
+                result[0] := Nul;
                 RETURN FALSE;
             END (*IF*);
             k := 0;

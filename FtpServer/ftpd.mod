@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  FtpServer FTP daemon                                                  *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2016   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ MODULE Ftpd;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            19 August 1997                  *)
-        (*  Last edited:        5 February 2015                 *)
+        (*  Last edited:        19 December 2015                *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (********************************************************)
@@ -632,7 +632,7 @@ PROCEDURE RunTheServer;
             IF ScreenEnabled THEN
                 ClearScreen;  SetBoundary (2, 30);
                 UpdateTopScreenLine (0, LogLine);
-                UpdateTopScreenLine (20, "Copyright (C) 1998-2015 Peter Moylan");
+                UpdateTopScreenLine (20, "Copyright (C) 1998-2016 Peter Moylan");
                 UpdateTopScreenLine (62, "Users: 0");
 
                 WriteString ("Listening on ");
@@ -800,6 +800,28 @@ PROCEDURE ShutdownRequestDetector;
     END ShutdownRequestDetector;
 
 (********************************************************************************)
+(*           PROCEDURE TO TELL THE OUTSIDE WORLD THAT WE'VE FINISHED            *)
+(********************************************************************************)
+
+PROCEDURE NotifyTermination;
+
+    (* Posts the global event semaphore that tells other programs that Weasel   *)
+    (* has shut down.                                                           *)
+
+    CONST semName = "\SEM32\FTPSERVER\FINISHED";
+
+    VAR hev: OS2.HEV;
+
+    BEGIN
+        hev := 0;
+        IF OS2.DosOpenEventSem (semName, hev) = OS2.ERROR_SEM_NOT_FOUND THEN
+            OS2.DosCreateEventSem (semName, hev, OS2.DC_SEM_SHARED, FALSE);
+        END (*IF*);
+        OS2.DosPostEventSem (hev);
+        OS2.DosCloseEventSem(hev);
+    END NotifyTermination;
+
+(********************************************************************************)
 (*                                 MAIN PROGRAM                                 *)
 (********************************************************************************)
 
@@ -841,5 +863,6 @@ BEGIN
     Wait (TaskDone);
     Signal (ShutdownRequest);
     Wait (TaskDone);
+    NotifyTermination;
 END Ftpd.
 

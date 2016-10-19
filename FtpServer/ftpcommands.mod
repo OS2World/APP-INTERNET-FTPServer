@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE FtpCommands;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            23 August 1997                  *)
-        (*  Last edited:        19 June 2015                    *)
+        (*  Last edited:        2 July 2015                     *)
         (*  Status:             All commands now implemented    *)
         (*                                                      *)
         (********************************************************)
@@ -206,6 +206,12 @@ TYPE
                       state: ClientState;
                       userOK, IsManager, MSGenabled, WasLogging, LogIt: BOOLEAN;
                   END (*RECORD*);
+
+    (* Note that both the ClientData and the user components are        *)
+    (* created by OpenSession, and they both remain valid until we call *)
+    (* CloseSession.  When the client credentials change, as for        *)
+    (* example when a PASS command is received, the user details must   *)
+    (* be updated by calls to RemoveUser and/or NewUser as needed.      *)
 
     (* Commands, for the command parser. *)
 
@@ -1045,6 +1051,11 @@ PROCEDURE HOST (session: Session;  VAR (*IN*) Params: ARRAY OF CHAR);
     BEGIN
         IF SetHost(session^.user, Params) THEN
             Reply (session, "220 Hostname recorded.");
+            IF session^.state <> Idle THEN
+                RemoveUser (session^.ClientData);
+                session^.state := Idle;
+            END (*IF*);
+            session^.LogIt := TRUE;
         ELSE
             Reply (session, "502 HOST command failed.");
         END (*IF*);
@@ -1230,7 +1241,7 @@ PROCEDURE OPTS (session: Session;  VAR (*IN*) command: ARRAY OF CHAR);
            |
                host:
                     IF command[0] = Nul THEN
-                        Reply (session, "501 A host name or domain name is required.");
+                        Reply (session, "200 A host name or domain name is optional.");
                         result := done;
                     ELSE
                         result := good;
@@ -1476,7 +1487,9 @@ PROCEDURE REIN (session: Session;  VAR (*IN*) dummy: ARRAY OF CHAR);
     BEGIN
         dummy[0] := dummy[0];    (* To avoid a compiler warning. *)
         WITH session^ DO
-            RemoveUser (ClientData);
+            IF state <> Idle THEN
+                RemoveUser (ClientData);
+            END (*IF*);
             EVAL (SetHost (user, ""));
             LogIt := TRUE;
             state := Idle;
@@ -2166,9 +2179,9 @@ PROCEDURE HandleCommand (S: Session;  Command: ARRAY OF CHAR;
         Strings.Assign (Command, CommandCopy);
         cmd := ParseCommand (Command);
 
-        (* If the user is not yet logged in, only HELP, USER, PASS, and QUIT are legal. *)
+        (* If the user is not yet logged in, only HELP, HOST, USER, PASS, and QUIT are legal. *)
 
-        IF (S^.state <> LoggedIn) AND (cmd <> help) AND (cmd <> quit)
+        IF (S^.state <> LoggedIn) AND (cmd <> help) AND (cmd <> host) AND (cmd <> quit)
                             AND (cmd <> user) AND (cmd <> pass) THEN
             cmd := notloggedin;
         END (*IF*);

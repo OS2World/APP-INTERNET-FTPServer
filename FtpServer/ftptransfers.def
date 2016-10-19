@@ -6,7 +6,7 @@ DEFINITION MODULE FtpTransfers;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            24 August 1997                  *)
-        (*  Last edited:        16 June 2015                    *)
+        (*  Last edited:        19 December 2015                *)
         (*  Status:             OK                              *)
         (*                                                      *)
         (********************************************************)
@@ -83,7 +83,9 @@ PROCEDURE SetHost (SS: ClientFileInfo;  hostname: ARRAY OF CHAR): BOOLEAN;
 
 PROCEDURE RecordLoginTime (SS: ClientFileInfo);
 
-    (* Puts the current date/time as the "last login time" for this user.       *)
+    (* Puts the current date/time as the "last login time" for this     *)
+    (* user.  This is also the point at which we check whether this is  *)
+    (* a limited-use account.                                           *)
 
 PROCEDURE CloseUser (SS: ClientFileInfo);
 

@@ -7,13 +7,14 @@ DEFINITION MODULE FDUsers;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            30 August 1997                  *)
-        (*  Last edited:        16 June 2015                    *)
+        (*  Last edited:        16 August 2016                  *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (********************************************************)
 
 
 FROM Types IMPORT CARD64;
+FROM Semaphores IMPORT Semaphore;
 FROM FileOps IMPORT ChanId;
 FROM Sockets IMPORT Socket;
 
@@ -48,7 +49,9 @@ PROCEDURE DestroyUserData (VAR (*INOUT*) U: User);
 
 PROCEDURE NoteLoginTime (U: User);
 
-    (* Puts the current date/time as the "last login time" for this user.       *)
+    (* Puts the current date/time as the "last login time" for this user.  This *)
+    (* is also the point at which we check whether this is a limited-use        *)
+    (* account.                                                                 *)
 
 PROCEDURE GetUserNumber (U: User;  VAR (*OUT*) UserNumber, Limit: CARDINAL);
 
@@ -167,8 +170,8 @@ TYPE
     (*                      '*' is appended.                                    *)
     (*   Recurse          Recurse over subdirectories.                          *)
 
-PROCEDURE ListDirectory (S: Socket;  U: User;  VAR (*INOUT*) arg: FName;
-                                       options: ListingOptions);
+PROCEDURE ListDirectory (S: Socket;  U: User;  KeepAlive: Semaphore;
+                            VAR (*INOUT*) arg: FName;  options: ListingOptions);
 
     (* Sends a directory listing, as specified by arg and options.  On return   *)
     (* arg has been disposed of.  Parameter arg uses the native character set,  *)
