@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Monitor for FtpServer                                                 *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2017   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -27,13 +27,13 @@ MODULE Monitor;
         (*             FtpServer Monitor - PM version               *)
         (*                                                          *)
         (*    Started:        26 March 2000                         *)
-        (*    Last edited:    19 November 2009                      *)
+        (*    Last edited:    15 September 2017                     *)
         (*    Status:         OK                                    *)
         (*                                                          *)
         (************************************************************)
 
 
-IMPORT OS2, OS2RTL, MainDialogue, FtpCl2, IOChan, TextIO, Strings;
+IMPORT OS2, OS2RTL, MainDialogue, FtpCl2, INIData, IOChan, TextIO, Strings;
 
 FROM ProgramArgs IMPORT
     (* proc *)  ArgChan, IsArgPresent;
@@ -66,7 +66,9 @@ PROCEDURE GetParameters;
         tail: ARRAY [0..4] OF CHAR;
 
     BEGIN
-        TNImode := FALSE;
+        IF NOT INIData.ChooseDefaultINI("Monitor", TNImode) THEN
+            TNImode := FALSE;
+        END (*IF*);
         args := ArgChan();
         IF IsArgPresent() THEN
             TextIO.ReadString (args, INIFileName);

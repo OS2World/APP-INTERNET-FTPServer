@@ -1,0 +1,22 @@
+DEFINITION MODULE WideUserDialogue;
+
+        (************************************************************)
+        (*                                                          *)
+        (*                  PM Setup for FtpServer                  *)
+        (*          Dialogue to edit the data for one user          *)
+        (*                                                          *)
+        (*    Started:        14 September 2017                     *)
+        (*    Last edited:    16 September 2017                     *)
+        (*    Status:         OK                                    *)
+        (*                                                          *)
+        (************************************************************)
+
+
+FROM OS2 IMPORT HWND;
+
+PROCEDURE SortDlg (owner, list: HWND);
+
+    (* Run dialogue to allow sorting of the usernames in list.  *)
+
+END WideUserDialogue.
+

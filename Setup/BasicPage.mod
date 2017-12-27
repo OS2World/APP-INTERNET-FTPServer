@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Setup for FtpServer                                                   *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2017   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,13 +28,13 @@ IMPLEMENTATION MODULE BasicPage;
         (*                    Page 1 of the notebook                    *)
         (*                                                              *)
         (*        Started:        8 October 1999                        *)
-        (*        Last edited:    10 June 2011                          *)
+        (*        Last edited:    17 October 2017                       *)
         (*        Status:         OK                                    *)
         (*                                                              *)
         (****************************************************************)
 
 
-FROM SYSTEM IMPORT ADDRESS, INT16, CAST, ADR;
+FROM SYSTEM IMPORT ADDRESS, INT16, CARD32, CAST, ADR;
 
 IMPORT OS2, OS2RTL, DID, Strings, CommonSettings;
 
@@ -57,7 +57,7 @@ FROM FileOps IMPORT
     (* proc *)  FirstDirEntry, NextDirEntry, DirSearchDone,
                 DeleteFile, MoveFile;
 
-FROM Inet2Misc IMPORT
+FROM MiscFuncs IMPORT
     (* type *)  CharArrayPointer,
     (* proc *)  EVAL, ToLower;
 
@@ -69,6 +69,9 @@ FROM Misc IMPORT
 
 FROM Names IMPORT
     (* type *)  UserName, UserNameIndex;
+
+FROM Timer IMPORT
+    (* proc *)  Sleep;
 
 FROM LowLevel IMPORT
     (* proc *)  IAND;
@@ -524,6 +527,8 @@ PROCEDURE StoreData (hwnd: OS2.HWND);
 
     (* Stores the values on page 1 back into the INI file. *)
 
+    CONST MaxTimeout = (MAX(CARD32)-1) DIV 1000;
+
     VAR value: CARDINAL;  TelnetDisable: BOOLEAN;
 
     BEGIN
@@ -560,6 +565,11 @@ PROCEDURE StoreData (hwnd: OS2.HWND);
         (* Timeout value. *)
 
         WinQueryDlgItemCard (hwnd, DID.TimeOut, value);
+        IF value > MaxTimeout THEN
+            value := MaxTimeout;
+            WinSetDlgItemCard (hwnd, DID.TimeOut, value);
+            Sleep (1000);
+        END (*IF*);
         IF value <> OldTimeout THEN
             INIPut ('$SYS', 'TimeOut', value);
         END (*IF*);

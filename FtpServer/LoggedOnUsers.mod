@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  FtpServer FTP daemon                                                  *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2017   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE LoggedOnUsers;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            24 October 1997                 *)
-        (*  Last edited:        5 February 2015                 *)
+        (*  Last edited:        8 October 2017                  *)
         (*  Status:             OK                              *)
         (*                                                      *)
         (********************************************************)
@@ -38,7 +38,7 @@ IMPORT SysClock, Strings;
 
 FROM SYSTEM IMPORT LOC, CARD8;
 
-FROM Types IMPORT
+FROM LONGLONG IMPORT
     (* type *)  CARD64;
 
 FROM FtpTransfers IMPORT
@@ -76,8 +76,11 @@ FROM INIData IMPORT
 FROM TransLog IMPORT
     (* type *)  TransactionLogID;
 
-FROM InetUtilities IMPORT
-    (* proc *)  IPToString, ConvertCard64, ConvertCardZ, AddEOL;
+FROM MiscFuncs IMPORT
+    (* proc *)  ConvertCard64, ConvertCardZ, AddEOL;
+
+FROM Inet2Misc IMPORT
+    (* proc *)  IPToString;
 
 FROM Sockets IMPORT
     (* const*)  NotASocket,

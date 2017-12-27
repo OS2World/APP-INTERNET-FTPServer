@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  FtpServer FTP daemon                                                  *)
-(*  Copyright (C) 2016   Peter Moylan                                     *)
+(*  Copyright (C) 2017   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,18 +28,16 @@ IMPLEMENTATION MODULE FtpTransfers;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            24 August 1997                  *)
-        (*  Last edited:        16 August 2016                  *)
+        (*  Last edited:        26 November 2017                *)
         (*  Status:             OK                              *)
         (*                                                      *)
         (********************************************************)
 
 FROM SYSTEM IMPORT CARD8, CARD16, LOC, ADDRESS, CAST;
 
-FROM Types IMPORT
-    (* type *)  CARD64;
-
 FROM LONGLONG IMPORT
     (* const*)  Zero64, Max64,
+    (* type *)  CARD64,
     (* proc *)  Add64, Sum64, Compare64, FLOAT64;
 
 IMPORT Volume, FileSys, Strings, SysClock;
@@ -60,19 +58,23 @@ FROM Sockets IMPORT
                 bind, listen, getsockname, accept,
                 getpeername, so_cancel, sock_errno;
 
+FROM SockErrnums IMPORT
+    (* const*)  SOCENOBUFS;
+
 FROM Conversions IMPORT
     (* proc *)  Card64ToString;
 
 FROM Internet IMPORT
     (* const*)  Zero8, INADDR_ANY;
 
-FROM InetUtilities IMPORT
-    (* proc *)  Swap2, Swap4, Synch, OpenLogFile,
-                CloseLogFile, IPToString, ConvertDecimal64, WaitForDataSocket,
+FROM MiscFuncs IMPORT
+    (* proc *)  OpenLogFile,
+                CloseLogFile, ConvertDecimal64,
                 AppendString, ConvertCard, ConvertCardZ, AppendCard, AddEOL;
 
 FROM Inet2Misc IMPORT
-    (* proc *)  AddressToHostName;
+    (* proc *)  Swap2, Swap4, Synch, AddressToHostName, IPToString,
+                WaitForDataSocket;
 
 FROM TransLog IMPORT
     (* type *)  TransactionLogID,
@@ -111,6 +113,9 @@ FROM FileOps IMPORT
 
 FROM Names IMPORT
     (* type *)  HostName, FilenameString;
+
+FROM Timer IMPORT
+    (* proc *)  Sleep;
 
 FROM Semaphores IMPORT
     (* type *)  Semaphore,
@@ -1630,7 +1635,8 @@ PROCEDURE ResetCount (SS: ClientFileInfo);
 
 (********************************************************************************)
 
-PROCEDURE SendAscii (CommandSocket, S: Socket;  VAR (*IN*) source: ARRAY OF LOC;
+PROCEDURE SendAscii (CommandSocket, S: Socket;  LogID: TransactionLogID;
+                                    VAR (*IN*) source: ARRAY OF LOC;
                                                    amount: CARDINAL): CARDINAL;
 
     (* Sends "amount" bytes of data from source to S.  The value returned is    *)
@@ -1638,8 +1644,10 @@ PROCEDURE SendAscii (CommandSocket, S: Socket;  VAR (*IN*) source: ARRAY OF LOC;
     (* amount because of things like conversion of line terminators.  If the    *)
     (* transfer fails, we return a result of MAX(CARDINAL).                     *)
 
-    VAR j, k, count, N: CARDINAL;  ch: CHAR;  AtEOL, AtEOF: BOOLEAN;
+    VAR j, k, count, N, errorcode: CARDINAL;
+        ch: CHAR;  AtEOL, AtEOF: BOOLEAN;
         CRLF: ARRAY[0..1] OF CHAR;
+        message: ARRAY [0..127] OF CHAR;
 
     BEGIN
         CRLF[0] := CR;  CRLF[1] := LF;
@@ -1675,10 +1683,37 @@ PROCEDURE SendAscii (CommandSocket, S: Socket;  VAR (*IN*) source: ARRAY OF LOC;
             IF k > j THEN
                 IF WaitForDataSocket (TRUE, S, CommandSocket) THEN
                     N := send (S, source[j], k-j, 0);
+                    IF N = MAX(CARDINAL) THEN
+                        errorcode := sock_errno();
+                    ELSE
+                        errorcode := 0;
+                    END (*IF*);
+                    IF errorcode = SOCENOBUFS THEN
+    
+                        (* Allow a second try for non-fatal error. *)
+    
+                        Sleep (100);
+                        N := send (S, source[j], k-j, 0);
+                        IF N = MAX(CARDINAL) THEN
+                            errorcode := sock_errno();
+                        ELSE
+                            errorcode := 0;
+                        END (*IF*);
+    
+                    END (*IF*);
+                    IF errorcode > 0 THEN
+                        Strings.Assign ("send()", message);
+                    END (*IF*);
                 ELSE
-                    N := MAX(CARDINAL);
+                    N := 0;
+                    errorcode := sock_errno();
+                    Strings.Assign ("select()", message);
                 END (*IF*);
-                IF N = MAX(CARDINAL) THEN
+
+                IF errorcode > 0 THEN
+                    Strings.Append (" failed, error number ", message);
+                    AppendCard (errorcode, message);
+                    LogTransaction (LogID, message);
                     count := MAX(CARDINAL);
                     AtEOF := TRUE;  AtEOL := FALSE;
                 ELSE
@@ -1707,16 +1742,16 @@ PROCEDURE SendAscii (CommandSocket, S: Socket;  VAR (*IN*) source: ARRAY OF LOC;
 
 (********************************************************************************)
 
-PROCEDURE PutFile (SS: ClientFileInfo;  id: ChanId;
-                   RateLimit: REAL;
-                   VAR (*OUT*) BytesSent: CARD64): BOOLEAN;
+PROCEDURE PutFile (SS: ClientFileInfo;  cid: ChanId;  RateLimit: REAL;
+                                        VAR (*OUT*) BytesSent: CARD64): BOOLEAN;
 
     (* Sends a file on a previously opened socket SS^.DataPort.socket. *)
 
     CONST BufferSize = 2048;
 
     VAR BuffPtr: POINTER TO ARRAY [0..BufferSize-1] OF LOC;
-        xferred: CARDINAL;  success: BOOLEAN;
+        message: ARRAY [0..127] OF CHAR;
+        xferred, errorcode: CARDINAL;  success: BOOLEAN;
         starttime, duration: REAL;
         S: Socket;
 
@@ -1726,19 +1761,46 @@ PROCEDURE PutFile (SS: ClientFileInfo;  id: ChanId;
         BytesSent := Zero64;  success := TRUE;
         starttime := FLOAT(millisecs());
         LOOP
-            ReadRaw (id, BuffPtr^, BufferSize, xferred);
+            ReadRaw (cid, BuffPtr^, BufferSize, xferred);
             IF xferred = 0 THEN
                 EXIT(*LOOP*)
             END (*IF*);
+            errorcode := 0;
             Signal (SS^.KickMe);
             IF SS^.LineStructured THEN
-                xferred := SendAscii (SS^.CommandSocket, S, BuffPtr^, xferred);
+                xferred := SendAscii (SS^.CommandSocket, S, SS^.TransLogID, BuffPtr^, xferred);
             ELSIF WaitForDataSocket (TRUE, S, SS^.CommandSocket) THEN
                 xferred := send (S, BuffPtr^, xferred, 0);
+                IF xferred = MAX(CARDINAL) THEN
+                    errorcode := sock_errno();
+                ELSE
+                    errorcode := 0;
+                END (*IF*);
+                IF errorcode = SOCENOBUFS THEN
+
+                    (* Allow a second try for non-fatal error. *)
+
+                    Sleep (100);
+                    xferred := send (S, BuffPtr^, xferred, 0);
+                    IF xferred = MAX(CARDINAL) THEN
+                        errorcode := sock_errno();
+                    ELSE
+                        errorcode := 0;
+                    END (*IF*);
+
+                END (*IF*);
+                IF errorcode > 0 THEN
+                    Strings.Assign ("send()", message);
+                END (*IF*);
             ELSE
-                xferred := MAX(CARDINAL);
+                xferred := 0;
+                errorcode := sock_errno();
+                Strings.Assign ("select()", message);
             END (*IF*);
-            IF xferred = MAX(CARDINAL) THEN
+            IF errorcode > 0 THEN
+                Strings.Append (" failed, error number ", message);
+                AppendCard (errorcode, message);
+                LogTransaction (SS^.TransLogID, message);
                 success := FALSE;
             ELSE
                 Add64 (BytesSent, xferred);
@@ -1770,7 +1832,8 @@ PROCEDURE PutFile (SS: ClientFileInfo;  id: ChanId;
 
 (********************************************************************************)
 
-PROCEDURE GetFile (SS: ClientFileInfo;  CommandSocket, S: Socket;  id: ChanId;
+PROCEDURE GetFile (SS: ClientFileInfo;
+                   CommandSocket, S: Socket;  id: ChanId;
                    RateLimit: REAL;  KeepAlive: Semaphore;
                    VAR (*OUT*) TooBig: BOOLEAN;  VAR (*OUT*) totalbytes: CARD64): BOOLEAN;
 
@@ -1781,7 +1844,8 @@ PROCEDURE GetFile (SS: ClientFileInfo;  CommandSocket, S: Socket;  id: ChanId;
     CONST BufferSize = 2048;
 
     VAR BuffPtr: POINTER TO ARRAY [0..BufferSize-1] OF LOC;
-        xferred: CARDINAL;  success: BOOLEAN;
+        message: ARRAY [0..127] OF CHAR;
+        xferred, errorcode: CARDINAL;  success: BOOLEAN;
         starttime, duration: REAL;
 
     BEGIN
@@ -1794,14 +1858,44 @@ PROCEDURE GetFile (SS: ClientFileInfo;  CommandSocket, S: Socket;  id: ChanId;
             Signal (KeepAlive);
             IF WaitForDataSocket (FALSE, S, CommandSocket) THEN
                 xferred := recv (S, BuffPtr^, BufferSize, 0);
+                IF xferred = MAX(CARDINAL) THEN
+                    errorcode := sock_errno();
+                ELSE
+                    errorcode := 0;
+                END (*IF*);
+                IF errorcode = SOCENOBUFS THEN
+
+                    (* Allow a second try for non-fatal error. *)
+
+                    Sleep (100);
+                    xferred := recv (S, BuffPtr^, BufferSize, 0);
+                    IF xferred = MAX(CARDINAL) THEN
+                        errorcode := sock_errno();
+                    ELSE
+                        errorcode := 0;
+                    END (*IF*);
+
+                END (*IF*);
+                IF errorcode > 0 THEN
+                    Strings.Assign ("recv()", message);
+                END (*IF*);
             ELSE
-                xferred := MAX(CARDINAL);
+                xferred := 0;
+                errorcode := sock_errno();
+                Strings.Assign ("select()", message);
             END (*IF*);
-            IF xferred = 0 THEN EXIT(*LOOP*)
-            ELSIF xferred = MAX(CARDINAL) THEN
+
+            IF errorcode > 0 THEN
+                Strings.Append (" failed, error number ", message);
+                AppendCard (errorcode, message);
+                LogTransaction (SS^.TransLogID, message);
                 success := FALSE;
                 EXIT(*LOOP*);
+            ELSIF xferred = 0 THEN EXIT(*LOOP*)
             END(*IF*);
+
+            (* End of socket error checks, now transfer the data. *)
+
             IF SpaceAvailable(SS^.iname) <= FreeSpaceThreshold THEN
                 success := FALSE;
                 EXIT (*LOOP*);

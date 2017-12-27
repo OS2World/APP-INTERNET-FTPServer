@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Monitor for FtpServer                                                 *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2017   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -27,7 +27,7 @@ IMPLEMENTATION MODULE MainDialogue;
         (*                        Main dialogue                         *)
         (*                                                              *)
         (*    Started:        29 March 2000                             *)
-        (*    Last edited:    26 June 2014                              *)
+        (*    Last edited:    8 October 2017                            *)
         (*    Status:         OK                                        *)
         (*                                                              *)
         (****************************************************************)
@@ -39,11 +39,9 @@ FROM SYSTEM IMPORT
 
 IMPORT OS2, DID, Init, INIData, Misc, Strings, KillServer, About;
 
-FROM Types IMPORT
-    (* type *)  CARD64;
-
 FROM LONGLONG IMPORT
     (* const*)  Zero64,
+    (* type *)  CARD64,
     (* proc *)  Compare64, Add64, Diff64, LongDiv64, ShortDiv;
 
 FROM FtpCl2 IMPORT
@@ -306,10 +304,10 @@ PROCEDURE MakeUserRecord (VAR (*IN*) text: ARRAY OF CHAR): UserDataPtr;
 
         (* Put IP address back onto text line. *)
 
-        buffer[0] := ' ';  buffer[1] := Nul;
+        Strings.Append (" (", p^.strval);
+        Misc.IPToString (p^.IPaddress, FALSE, buffer);
         Strings.Append (buffer, p^.strval);
-        Misc.IPToString (p^.IPaddress, TRUE, buffer);
-        Strings.Append (buffer, p^.strval);
+        Strings.Append (")", p^.strval);
 
         RETURN p;
 
@@ -1029,6 +1027,7 @@ PROCEDURE ["SysCall"] MainDialogueProc (hwnd     : OS2.HWND
            |  WM_DISPLAYUSERS:
                    UpdateDisplay (OS2.WinWindowFromID(hwnd, DID.UserList));
                    DetailsOfSelectedItem (hwnd);
+                   RETURN OS2.WinDefDlgProc(hwnd, msg, mp1, mp2);
 
            |  OS2.WM_ADJUSTFRAMEPOS:
                    AdjustListWindowSize (mp1);

@@ -6,14 +6,14 @@ DEFINITION MODULE FtpTransfers;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            24 August 1997                  *)
-        (*  Last edited:        19 December 2015                *)
+        (*  Last edited:        26 November 2017                *)
         (*  Status:             OK                              *)
         (*                                                      *)
         (********************************************************)
 
 
 FROM SYSTEM     IMPORT (*TYPE*) CARD16;
-FROM Types      IMPORT (*TYPE*) CARD64;
+FROM LONGLONG   IMPORT (*TYPE*) CARD64;
 FROM FDUsers    IMPORT (*TYPE*) UserCategory;
 FROM TransLog   IMPORT (*TYPE*) TransactionLogID;
 FROM Sockets    IMPORT (*TYPE*) Socket, SockAddr;

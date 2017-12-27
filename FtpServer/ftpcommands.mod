@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  FtpServer FTP daemon                                                  *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2017   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,8 +28,8 @@ IMPLEMENTATION MODULE FtpCommands;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            23 August 1997                  *)
-        (*  Last edited:        2 July 2015                     *)
-        (*  Status:             All commands now implemented    *)
+        (*  Last edited:        26 November 2017                *)
+        (*  Status:             All commands implemented        *)
         (*                                                      *)
         (********************************************************)
 
@@ -74,7 +74,8 @@ IMPLEMENTATION MODULE FtpCommands;
 (* The draft expires in January 2009.                                           *)
 (*                                                                              *)
 (* Also added: SITE UTIME   (not covered by a standard)                         *)
-(*             HOST   (RFC 7151)                                                *)
+(*             HOST         (RFC 7151)                                          *)
+(*             EPRT, EPSV   (RFC 2428)                                          *)
 (*                                                                              *)
 (********************************************************************************)
 
@@ -82,11 +83,9 @@ FROM SYSTEM IMPORT CARD8, CARD16, CARD32, CAST, ADDRESS, ADR;
 
 IMPORT Strings, IOChan, ChanConsts, RndFile, OS2, FileOps;
 
-FROM Types IMPORT
-    (* type *)  CARD64;
-
 FROM LONGLONG IMPORT
     (* const*)  Zero64, Max64,
+    (* type *)  CARD64,
     (* proc *)  Compare64;
 
 FROM Sockets IMPORT
@@ -96,11 +95,12 @@ FROM Sockets IMPORT
 FROM Internet IMPORT
     (* type *)  InternetSocketAddress;
 
-FROM InetUtilities IMPORT
-    (* proc *)  Synch, ToLower, ConvertCard64, AddEOL;
-
 FROM Inet2Misc IMPORT
-    (* proc *)  EVAL, ConvertCard;
+    (* proc *)  Synch;
+
+FROM MiscFuncs IMPORT
+    (* proc *)  EVAL, StringMatch, GetNum, ConvertCard, ToLower,
+                ConvertCard64, AddEOL;
 
 FROM TransLog IMPORT
     (* type *)  TransactionLogID,
@@ -194,6 +194,7 @@ TYPE
     (*     WasLogging  Old value of Logit                               *)
     (*     LogIt       TRUE iff we want to log this session in the      *)
     (*                     transaction log.                             *)
+    (*     EPSVALL     An "EPSV ALL" command has been received.         *)
 
     Session = POINTER TO
                   RECORD
@@ -204,7 +205,8 @@ TYPE
                       usernumber: CARDINAL;
                       LoginAttempts: CARD8;
                       state: ClientState;
-                      userOK, IsManager, MSGenabled, WasLogging, LogIt: BOOLEAN;
+                      userOK, IsManager, MSGenabled, WasLogging,
+                                                LogIt, EPSVALL: BOOLEAN;
                   END (*RECORD*);
 
     (* Note that both the ClientData and the user components are        *)
@@ -216,7 +218,8 @@ TYPE
     (* Commands, for the command parser. *)
 
     CmdType = (unknown, notloggedin,
-               abor, acct, allo, appe, cdup, cwd, dele, feat, help, host, lang, list,
+               abor, acct, allo, appe, cdup, cwd, dele, eprt, epsv, feat,
+               help, host, lang, list,
                mdtm, mkd, mode, nlst, noop, opts, pasw, pass, pasv, port, pwd,
                quit, rein, rest, retr, rmd, rnfr, rnto, site, size, smnt, stat,
                stor, stou, stru, syst, type, user, xcup, xcwd, xmkd, xpwd, xrmd);
@@ -228,7 +231,8 @@ TYPE
 CONST
     KeywordList = KeywordArray {'????', '????',
                                'ABOR', 'ACCT', 'ALLO', 'APPE', 'CDUP', 'CWD ',
-                               'DELE', 'FEAT', 'HELP', 'HOST', 'LANG', 'LIST',
+                               'DELE', 'EPRT', 'EPSV', 'FEAT', 'HELP', 'HOST',
+                               'LANG', 'LIST',
                                'MDTM', 'MKD ', 'MODE', 'NLST', 'NOOP', 'OPTS',
                                'P@SW', 'PASS', 'PASV', 'PORT',
                                'PWD ', 'QUIT', 'REIN', 'REST', 'RETR', 'RMD ',
@@ -358,6 +362,7 @@ PROCEDURE OpenSession (CommandSocket: Socket;  UserNumber, IPaddr: CARDINAL;
             MSGenabled := TRUE;
             WasLogging := TRUE;
             LogIt := TRUE;
+            EPSVALL := FALSE;
         END (*WITH*);
         RETURN result;
     END OpenSession;
@@ -749,152 +754,6 @@ PROCEDURE ExecProg (session: Session;
     END ExecProg;
 
 (********************************************************************************)
-
-(*
-PROCEDURE OldExecProg (session: Session;
-                    VAR (*IN*) ProgName, Params: ARRAY OF CHAR);
-
-    (* This procedure executes the specified program on behalf of the   *)
-    (* client.  The client thread remains blocked until the command     *)
-    (* completes.  This procedure provides the response to the client.  *)
-
-    CONST ONLength = 256;
-
-    TYPE
-        QDataType = RECORD
-                        sessID, procID: OS2.USHORT;
-                    END (*RECORD*);
-
-    VAR rc: CARDINAL;
-        CmdName, ArgString, cmdfilename: FilenameString;
-        FailureObjectName: ARRAY [0..ONLength-1] OF CHAR;
-        QName: ARRAY [0..32] OF CHAR;
-        StartData: OS2.STARTDATA;
-        idSession, length, pos: CARDINAL;
-        priority: CARD8;
-        pQData: POINTER TO QDataType;
-        pid: OS2.PID;
-        f: FileOps.ChanId;
-        hq: OS2.HQUEUE;
-        Request: OS2.REQUESTDATA;
-        ptib: OS2.PTIB;
-        ppib: OS2.PPIB;
-
-    BEGIN
-        IF ProgName[0] = Nul THEN
-            Reply (session, "501 Nothing to execute.");
-            RETURN;
-        END (*IF*);
-
-        (* Create a temporary command file, and put commands into it   *)
-        (* to set the directory and then invoke the program.           *)
-
-        f := CreateCommandFile(cmdfilename);
-        IF f = NoSuchChannel THEN
-            Reply (session, "451 Cannot create command file.");
-            RETURN;
-        END (*IF*);
-
-        RealCurrentDirectory (session^.user, ArgString);
-        IF ArgString[0] <> Nul THEN
-            IF ArgString[1] = ':' THEN
-                FileOps.FWriteChar (f, ArgString[0]);
-                FileOps.FWriteChar (f, ':');
-                FileOps.FWriteLn (f);
-                Strings.Delete (ArgString, 0, 2);
-            END (*IF*);
-            FileOps.FWriteString (f, "CD ");
-            IF ArgString[0] = Nul THEN
-                ArgString := "\";
-            END (*IF*);
-            FileOps.FWriteString (f, ArgString);
-            FileOps.FWriteLn (f);
-        END (*IF*);
-        FileOps.FWriteString (f, ProgName);
-        IF Params[0] <> Nul THEN
-            FileOps.FWriteChar (f, " ");
-            FileOps.FWriteString (f, Params);
-        END (*IF*);
-        FileOps.FWriteLn (f);
-
-        CloseFile (f);
-
-        CmdName := "CMD.EXE";
-        ArgString := "/C ";
-        Strings.Append (cmdfilename, ArgString);
-
-        (* Create the queue that will allow us to find out when the     *)
-        (* child process terminates.  Note that we need exclusive       *)
-        (* access both when using this queue and when running the       *)
-        (* child process.                                               *)
-
-        Obtain (ExecLock);
-        QName := "\queues\ftpserver.que";
-        rc := OS2.DosCreateQueue (hq, OS2.QUE_FIFO + OS2.QUE_CONVERT_ADDRESS,
-                                           QName);
-
-        (* Execute the command file. *)
-
-        WITH StartData DO
-            Length     :=  SIZE(OS2.STARTDATA);
-            Related    :=  OS2.SSF_RELATED_CHILD;
-            FgBg       :=  OS2.SSF_FGBG_FORE;
-            TraceOpt   :=  OS2.SSF_TRACEOPT_NONE;
-            PgmTitle   :=  NIL;
-            PgmName    :=  ADR(CmdName);
-            PgmInputs  :=  ADR(ArgString);
-            TermQ      :=  ADR(QName);
-            Environment:=  NIL;
-            InheritOpt :=  OS2.SSF_INHERTOPT_PARENT;
-            SessionType:=  OS2.SSF_TYPE_WINDOWABLEVIO;
-            IconFile   :=  NIL;
-            PgmHandle  :=  0;
-            PgmControl :=  OS2.SSF_CONTROL_MINIMIZE (*+ OS2.SSF_CONTROL_NOAUTOCLOSE*);
-            InitXPos   :=  30;
-            InitYPos   :=  40;
-            InitXSize  :=  200;
-            InitYSize  :=  140;
-            Reserved   :=  0;
-            ObjectBuffer  :=  ADR(FailureObjectName);
-            ObjectBuffLen :=  ONLength;
-        END (*WITH*);
-
-        rc := OS2.DosStartSession (StartData, idSession, pid);
-
-        (* Starting in background (code 457) is not an error. *)
-
-        IF (rc <> 0) AND (rc <> 457) THEN
-            Reply (session, "200 Command failed.");
-            RETURN;
-        END (*IF*);
-
-        (* Wait for the child session to finish. *)
-
-        rc := OS2.DosGetInfoBlocks (ptib, ppib);
-        Request.pid := ppib^.pib_ulpid;
-        rc := OS2.DosReadQueue (hq, Request, length, pQData,
-                                    0, FALSE, priority, 0);
-        IF rc = 0 THEN
-            rc := pQData^.procID;
-        END (*IF*);
-        ArgString := "200 Program terminated with result ";
-        pos := LENGTH (ArgString);
-        ConvertCard (rc, ArgString, pos);
-        ArgString[pos] := Nul;
-        (*DEALLOCATE (pQData, length);*)
-        rc := OS2.DosCloseQueue (hq);
-        Release (ExecLock);
-
-        (* Delete the temporary command file. *)
-
-        FileOps.DeleteFile (cmdfilename);
-
-        Reply (session, ArgString);
-
-    END OldExecProg;
-*)
-
-(********************************************************************************)
 (*                     HANDLERS FOR THE INDIVIDUAL COMMANDS                     *)
 (********************************************************************************)
 
@@ -997,6 +856,118 @@ PROCEDURE DELE (session: Session;  VAR (*IN*) Params: ARRAY OF CHAR);
 
 (********************************************************************************)
 
+PROCEDURE EPRT (session: Session;  VAR (*IN*) Params: ARRAY OF CHAR);
+
+    VAR addr: RECORD
+                 CASE :BOOLEAN OF
+                     FALSE: byte: ARRAY [0..3] OF CARD8;
+                     |TRUE: word: CARD32;
+                 END (*CASE*);
+              END (*RECORD*);
+
+    VAR j, pos, port: CARDINAL;  delimiter: CHAR;  Error: BOOLEAN;
+
+    BEGIN
+        IF session^.EPSVALL THEN
+            Reply (session, "503 EPSV ALL has been issued");
+            RETURN;
+        END (*IF*);
+
+        delimiter := Params[0];
+        pos := 1;
+        IF Params[1] <> '1' THEN
+            Reply (session, "522 Network protocol not supported, use (1)");
+            RETURN;
+        END (*IF*);
+
+        Error := Params[2] <> delimiter;
+        IF NOT Error THEN
+
+            (* Get the address. *)
+
+            pos := 3;
+            FOR j := 0 TO 3 DO
+                addr.byte[j] := GetNum (Params, pos);
+                IF (pos > HIGH(Params)) OR (Params[pos] = Nul) THEN
+                    Error := TRUE;
+                ELSIF (j < 3) THEN
+                    IF Params[pos] = '.' THEN INC(pos);
+                    ELSE Error := TRUE;
+                    END (*IF*);
+                END (*IF*);
+            END (*FOR*);
+        END (*IF*);
+        IF Params[pos] = delimiter THEN
+            INC (pos);
+        ELSE
+            Error := TRUE;
+        END (*IF*);
+
+        port := 0;
+        IF NOT Error THEN
+
+            (* Get the port number. *)
+
+            port := GetNum(Params, pos);
+
+        END (*IF*);
+        IF Params[pos] = delimiter THEN
+            INC (pos);
+        ELSE
+            Error := TRUE;
+        END (*IF*);
+
+        IF (pos <= HIGH(Params)) AND (Params[pos] <> Nul) THEN
+            Error := TRUE;
+        END (*IF*);
+
+        IF Error THEN
+            Reply (session, "501 Syntax error.");
+        ELSIF UnacceptablePort (session^.user, addr.word, port) THEN
+            Reply (session, "504 Unacceptable parameters in EPRT command.");
+        ELSE
+            SetPort (session^.user, addr.word, port);
+            Reply (session, "200 Data port set");
+        END (*IF*);
+
+    END EPRT;
+
+(********************************************************************************)
+
+PROCEDURE EPSV (session: Session;  VAR (*IN*) arg: ARRAY OF CHAR);
+
+    VAR msg: ARRAY [0..63] OF CHAR;
+        pos: CARDINAL;
+        myaddr: SockAddr;
+
+    BEGIN     (* body of EPSV *)
+        IF StringMatch (arg, "ALL") THEN
+            session^.EPSVALL := TRUE;
+            Reply (session, "200 EPSV command successful.");
+        ELSE
+            (* Only other acceptable non-null argument is '1'.  *)
+            IF arg[0] <> Nul THEN
+                IF (arg[0] <> '1') OR (arg[1] <> Nul) THEN
+                    Reply (session, "522 Network protocol not supported, use (1)");
+                    RETURN;
+                END (*IF*);
+            END (*IF*);
+            IF EnterPassiveMode (session^.user, myaddr) THEN
+                msg := "229 Entering passive mode (|||";
+                pos := Strings.Length (msg);
+                ConvertCard (myaddr.in_addr.port, msg, pos);
+                msg[pos] := '|';  INC(pos);
+                msg[pos] := ')';  INC(pos);
+                msg[pos] := Nul;  INC(pos);
+                Reply (session, msg);
+            ELSE
+                Reply (session, "502 EPSV did not succeed");
+            END (*IF*);
+        END (*IF*);
+    END EPSV;
+
+(********************************************************************************)
+
 PROCEDURE FEAT (session: Session;  VAR (*IN*) dummy: ARRAY OF CHAR);
 
     (* All defined and specified commands and features not defined in [RFC959], *)
@@ -1007,14 +978,16 @@ PROCEDURE FEAT (session: Session;  VAR (*IN*) dummy: ARRAY OF CHAR);
         dummy[0] := dummy[0];    (* To avoid a compiler warning. *)
 
         Reply (session, "211-Extensions supported:");
+        Reply (session, " EPRT");
+        Reply (session, " EPSV");
+        Reply (session, " HOST");
         Reply (session, " LANG EN*");
         Reply (session, " MDTM");
-        Reply (session, " SITE UTIME");
         Reply (session, " REST STREAM");
+        Reply (session, " SITE UTIME");
         Reply (session, " SIZE");
         Reply (session, " TVFS");
         Reply (session, " TYPE A;I;U;L 8");
-        Reply (session, " HOST");
         Reply (session, " UTF8");
         Reply (session, " XCUP");
         Reply (session, " XCWD");
@@ -1034,12 +1007,12 @@ PROCEDURE HELP (session: Session;  VAR (*IN*) dummy: ARRAY OF CHAR);
 
         Reply (session, "214-The following commands are recognized.");
         Reply (session, "   ABOR    ACCT    ALLO    APPE    CDUP    CWD     DELE");
-        Reply (session, "   FEAT    HELP    HOST    LANG    LIST    MDTM    MKD");
-        Reply (session, "   MODE    NLST    NOOP    OPTS    PASS    PASV    PORT");
-        Reply (session, "   PWD     QUIT    REIN    REST    RETR    RMD     RNFR");
-        Reply (session, "   RNTO    SITE    SIZE    SMNT    STAT    STOR    STOU");
-        Reply (session, "   STRU    SYST    TYPE    USER    XCUP    XCWD    XMKD");
-        Reply (session, "   XPWD    XRMD");
+        Reply (session, "   EPRT    EPSV    FEAT    HELP    HOST    LANG    LIST");
+        Reply (session, "   MDTM    MKD     MODE    NLST    NOOP    OPTS    PASS");
+        Reply (session, "   PASV    PORT    PWD     QUIT    REIN    REST    RETR");
+        Reply (session, "   RMD     RNFR    RNTO    SITE    SIZE    SMNT    STAT");
+        Reply (session, "   STOR    STOU    STRU    SYST    TYPE    USER    XCUP");
+        Reply (session, "   XCWD    XMKD    XPWD    XRMD");
         Reply (session, "214 End of list.");
 
     END HELP;
@@ -1239,6 +1212,9 @@ PROCEDURE OPTS (session: Session;  VAR (*IN*) command: ARRAY OF CHAR);
                         result := good;
                     END (*IF*);
            |
+               eprt, epsv:
+                    result := nothandled;
+           |
                host:
                     IF command[0] = Nul THEN
                         Reply (session, "200 A host name or domain name is optional.");
@@ -1412,6 +1388,11 @@ PROCEDURE PASV (session: Session;  VAR (*IN*) dummy: ARRAY OF CHAR);
 
     BEGIN     (* body of PASV *)
         dummy[0] := dummy[0];    (* To avoid a compiler warning. *)
+        IF session^.EPSVALL THEN
+            Reply (session, "503 EPSV ALL has been issued");
+            RETURN;
+        END (*IF*);
+
         IF EnterPassiveMode (session^.user, myaddr) THEN
             Decode;
             Reply3 (session, "227 Entering passive mode (", PortString, ")");
@@ -1434,6 +1415,11 @@ PROCEDURE PORT (session: Session;  VAR (*IN*) Params: ARRAY OF CHAR);
     VAR j, pos: CARDINAL;  val: CARD8;  Error: BOOLEAN;
 
     BEGIN
+        IF session^.EPSVALL THEN
+            Reply (session, "503 EPSV ALL has been issued");
+            RETURN;
+        END (*IF*);
+
         pos := 0;  Error := FALSE;
         FOR j := 0 TO 5 DO
             val := 0;
@@ -2155,7 +2141,8 @@ TYPE
 CONST
     HandlerList = HandlerArray {NoSuchCommand, NotLoggedIn,
                                ABOR, ACCT, ALLO, APPE, CDUP, CWD,
-                               DELE, FEAT, HELP, HOST, LANG, LIST, MDTM, MKD, MODE,
+                               DELE, EPRT, EPSV, FEAT, HELP, HOST, LANG,
+                               LIST, MDTM, MKD, MODE,
                                NLST, NOOP, OPTS, PASV, PASS, PASV, PORT,
                                PWD, QUIT, REIN, REST, RETR, RMD,
                                RNFR, RNTO, SITE, Size, SMNT, STAT,

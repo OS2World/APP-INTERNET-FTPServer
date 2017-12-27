@@ -47,6 +47,8 @@ CONST
    UserCount*        = 409;
    debug1*           = 410;
    debug2*           = 411;
+   SortButton*       = 412;
+   SortButton2*      = 413;
    Security*         = 500;
    SameIPLimit*      = 501;
    FilterList*       = 502;
@@ -188,5 +190,17 @@ CONST
    PickTestGOButton* = 1602;
    PickTestStatus*   = 1603;
    PickTestFileName* = 1604;
+   WideUserDialogue* = 1700;
+   WUlist*           = 1702;
+   WUdone*           = 1709;
+   namebutton*       = 1710;
+   typebutton*       = 1711;
+   lastloginbutton*  = 1712;
+   WideUserDialogue_2* = 1800;
+   container*        = 1801;
+   WU2done*          = 1809;
+   username2*        = 1810;
+   type2*            = 1811;
+   lastlogin2*       = 1812;
 
 END DID.

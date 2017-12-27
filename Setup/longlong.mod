@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  PMOS/2 software library                                               *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2017   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,13 +28,22 @@ IMPLEMENTATION MODULE LONGLONG;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            17 October 2001                 *)
-        (*  Last edited:        1 June 2011                     *)
+        (*  Last edited:        13 November 2017                *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (********************************************************)
 
-FROM SYSTEM IMPORT CARD16;
-FROM Types IMPORT CARD64, INT64;
+FROM SYSTEM IMPORT CARD16, CARD32;
+
+(************************************************************************)
+
+PROCEDURE IsZero (val: CARD64): BOOLEAN;
+
+    (* Returns TRUE iff val = 0 *)
+
+    BEGIN
+        RETURN (val.high = 0) AND (val.low = 0);
+    END IsZero;
 
 (************************************************************************)
 
@@ -89,6 +98,21 @@ PROCEDURE Sub64 (VAR (*INOUT*) A: CARD64;  B: CARDINAL);
             A.low := A.low - B;
         END (*IF*);
     END Sub64;
+
+(************************************************************************)
+
+PROCEDURE DEC64 (VAR (*INOUT*) A: CARD64);
+
+    (* Decrements A by 1.  *)
+
+    BEGIN
+        IF A.low = 0 THEN
+            A.low := MAX(CARDINAL);
+            DEC (A.high);
+        ELSE
+            DEC (A.low);
+        END (*IF*);
+    END DEC64;
 
 (************************************************************************)
 
@@ -169,6 +193,64 @@ PROCEDURE ShortSub (A, B: CARD64): CARDINAL;
         ELSE RETURN MAX(CARDINAL)
         END (*IF*);
     END ShortSub;
+
+(************************************************************************)
+
+PROCEDURE Mul32 (A, B: CARDINAL): CARD64;
+
+    (* Returns A*B. *)
+
+    (********************************************************************)
+
+    PROCEDURE INC32 (VAR (*INOUT*) X: CARD32; Y: CARD32;
+                                        VAR (*OUT*) carry: BOOLEAN);
+
+        (* X := X+Y, but with overflow check. *)
+
+        BEGIN
+            IF X > MAX(CARD32) - Y THEN
+                X := X - (MAX(CARD32) - Y) - 1;
+                carry := TRUE;
+            ELSE
+                INC (X, Y);  carry := FALSE;
+            END (*IF*);
+        END INC32;
+
+    (********************************************************************)
+
+    CONST scale = MAX(CARD16) + 1;
+
+    TYPE twopart =  RECORD
+                        CASE :BOOLEAN OF
+                            FALSE:  w: CARD32;
+                          | TRUE:   h: RECORD
+                                           lo, hi: CARD16;
+                                       END (*RECORD*);
+                        END (*CASE*);
+                    END (*RECORD*);
+
+    VAR A2, B2, middle, reslow: twopart;
+        result: CARD64;  carry: BOOLEAN;
+
+    BEGIN
+        A2.w := A;  B2.w := B;
+        result.high := A2.h.hi*B2.h.hi;  reslow.w := A2.h.lo*B2.h.lo;
+
+        (* Now add in the "middle" term. *)
+
+        middle.w := reslow.h.hi;
+        INC32 (middle.w, A2.h.hi*B2.h.lo, carry);
+        IF carry THEN INC (result.high, scale) END (*IF*);
+        INC32 (middle.w, A2.h.lo*B2.h.hi, carry);
+        IF carry THEN INC (result.high, scale) END (*IF*);
+
+        reslow.h.hi := middle.h.lo;
+        result.low := reslow.w;
+        INC (result.high, middle.h.hi);
+
+        RETURN result;
+
+    END Mul32;
 
 (************************************************************************)
 

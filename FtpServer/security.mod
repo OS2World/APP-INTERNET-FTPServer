@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Text-mode setup for FtpServer                                         *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2017   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE Security;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            1 February 1998                 *)
-        (*  Last edited:        22 January 2014                 *)
+        (*  Last edited:        22 May 2017                     *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (********************************************************)
@@ -46,8 +46,11 @@ FROM INIData IMPORT
     (* type *)  HINI,
     (* proc *)  INIGet, INIGetTrusted, INIPut, INIPutBinary, ItemSize;
 
-FROM InetUtilities IMPORT
-    (* proc *)  ConvertCard, Swap4;
+FROM MiscFuncs IMPORT
+    (* proc *)  ConvertCard;
+
+FROM Inet2Misc IMPORT
+    (* proc *)  Swap4;
 
 FROM MultiScreen IMPORT
     (* type *)  ScreenGroup, VirtualScreen,

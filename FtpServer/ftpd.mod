@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  FtpServer FTP daemon                                                  *)
-(*  Copyright (C) 2016   Peter Moylan                                     *)
+(*  Copyright (C) 2017   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ MODULE Ftpd;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            19 August 1997                  *)
-        (*  Last edited:        19 December 2015                *)
+        (*  Last edited:        18 September 2017               *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (********************************************************)
@@ -77,11 +77,13 @@ FROM FtpdINI IMPORT
 
 FROM INIData IMPORT
     (* type *)  HINI,
-    (* proc *)  INIValid, INIGet, INIGetString;
+    (* proc *)  INIValid, INIGet, INIGetString, ChooseDefaultINI;
 
-FROM InetUtilities IMPORT
-    (* proc *)  Swap2, IPToString, ConvertDecimal, AppendCard,
-                GetLastError, WaitForSocket;
+FROM MiscFuncs IMPORT
+    (* proc *)  ConvertDecimal, AppendCard;
+
+FROM Inet2Misc IMPORT
+    (* proc *)  Swap2, IPToString, WaitForSocket;
 
 FROM Names IMPORT
     (* type *)  HostName, FilenameIndex, FilenameString;
@@ -132,6 +134,7 @@ VAR
     CalledFromInetd: BOOLEAN;
     RapidShutdown: BOOLEAN;
     ScreenEnabled: BOOLEAN;
+    UseTNI: BOOLEAN;
     BindAddr, ServerPort: CARDINAL;
 
     (* Transaction log level as set by the 'D' and/or 'L' options.  This  *)
@@ -255,13 +258,14 @@ PROCEDURE GetParameters;
 
     (****************************************************************************)
 
-    VAR level, pos: CARDINAL;  TNImode: BOOLEAN;
+    VAR level, pos, TNIoption: CARDINAL;  TNImode: BOOLEAN;
         tail: ARRAY [0..3] OF CHAR;
 
     BEGIN
         AlreadySet := ParameterSet{};
         CmdLevel := 0;
         TNImode := FALSE;
+        TNIoption := 2;              (* meaning "no decision yet" *)
         INIFileName := "FTPD.INI";
         args := ArgChan();
         IF IsArgPresent() THEN
@@ -284,7 +288,9 @@ PROCEDURE GetParameters;
                                                          pos, 4, tail);
                                         Strings.Capitalize (tail);
                                         IF Strings.Equal (tail, ".TNI") THEN
-                                            TNImode := TRUE;
+                                            TNIoption := 1;
+                                        ELSE
+                                            TNIoption := 0;
                                         END (*IF*);
                   | 'L':      INC (j);  level := GetNumber() MOD 4;
                                         CmdLevel := 16*(CmdLevel DIV 16)
@@ -294,15 +300,7 @@ PROCEDURE GetParameters;
                                         INCL (AlreadySet, 'M');
                   | 'P':      INC (j);  ServerPort := GetNumber();
                                         INCL (AlreadySet, 'P');
-                  | 'S':      INC (j);  TNImode := TRUE;
-                                        pos := LENGTH(INIFileName)-4;
-                                        Strings.Extract (INIFileName,
-                                                         pos, 4, tail);
-                                        Strings.Capitalize (tail);
-                                        IF Strings.Equal (tail, ".INI") THEN
-                                            INIFileName[pos] := CHR(0);
-                                            Strings.Append (".TNI", INIFileName);
-                                        END (*IF*);
+                  | 'S':      INC (j);  TNIoption := 1;
                   | 'T':      INC (j);  pos := GetNumber();
                                         IF pos = 0 THEN
                                             DEC(j);  Options[j] := 'S';
@@ -324,10 +322,22 @@ PROCEDURE GetParameters;
             END (*LOOP*);
         END (*IF*);
 
-        (*TNImode := TRUE;*)   (* while debugging *)
-        IF TNImode THEN
-            INIFileName := "FTPD.TNI";
+        IF TNIoption < 2 THEN
+            TNImode := TNIoption <> 0;
+        ELSIF NOT ChooseDefaultINI("Ftpd", TNImode) THEN
+            TNImode := FALSE;
         END (*IF*);
+        IF TNImode THEN
+            pos := LENGTH(INIFileName)-4;
+            Strings.Extract (INIFileName,
+                             pos, 4, tail);
+            Strings.Capitalize (tail);
+            IF Strings.Equal (tail, ".INI") THEN
+                INIFileName[pos] := CHR(0);
+                Strings.Append (".TNI", INIFileName);
+            END (*IF*);
+        END (*IF*);
+
         SetINIFileName (INIFileName, TNImode);
 
     END GetParameters;
@@ -489,7 +499,6 @@ PROCEDURE LoadINIData(): BOOLEAN;
     (********************************************************************)
 
     VAR FreeSpaceThreshold, UserLogging, level, TransLevel, HashMax: CARDINAL;
-        UseTNI: BOOLEAN;
         CommonLogName, UserLogName, INIFileName: FilenameString;
 
     BEGIN
@@ -538,8 +547,7 @@ PROCEDURE LoadINIData(): BOOLEAN;
             ELSE
                 WriteChar ('I');
             END (*IF*);
-            WriteString ("NI file, error code ");
-            WriteCard (GetLastError());
+            WriteString ("NI file");
             WriteLn;
             RETURN FALSE;
         END (*IF*);
@@ -627,12 +635,17 @@ PROCEDURE RunTheServer;
             temp := 1;
             setsockopt (MainSocket, 0FFFFH, 4, temp, SIZE(CARDINAL));
 
-            LogLine := "FtpServer v";
+            IF UseTNI THEN
+                LogLine := "[T]";
+            ELSE
+                LogLine := "[I]";
+            END (*IF*);
+            Strings.Append (" FtpServer v", LogLine);
             Strings.Append (FV.version, LogLine);
             IF ScreenEnabled THEN
                 ClearScreen;  SetBoundary (2, 30);
                 UpdateTopScreenLine (0, LogLine);
-                UpdateTopScreenLine (20, "Copyright (C) 1998-2016 Peter Moylan");
+                UpdateTopScreenLine (22, "Copyright (C) 1998-2017 Peter Moylan");
                 UpdateTopScreenLine (62, "Users: 0");
 
                 WriteString ("Listening on ");

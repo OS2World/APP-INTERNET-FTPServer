@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Setup for FtpServer                                                   *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2017   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE Tree;
         (*          Dialogue to edit a file permission tree         *)
         (*                                                          *)
         (*    Started:        4 November 1999                       *)
-        (*    Last edited:    24 May 2013                           *)
+        (*    Last edited:    22 May 2017                           *)
         (*    Status:         Working                               *)
         (*                                                          *)
         (*   Faults:                                                *)
@@ -40,7 +40,7 @@ IMPLEMENTATION MODULE Tree;
 
 IMPORT SYSTEM, OS2, Remote, DID, Nodes, Strings;
 
-FROM Inet2Misc IMPORT
+FROM MiscFuncs IMPORT
     (* type *)  CharArrayPointer;
 
 FROM RINIData IMPORT

@@ -5,7 +5,7 @@ DEFINITION MODULE Conversions;
         (*              Miscellaneous type conversions          *)
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
-        (*  Last edited:        12 February 2004                *)
+        (*  Last edited:        6 October 2017                  *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (********************************************************)
@@ -13,7 +13,7 @@ DEFINITION MODULE Conversions;
 FROM SYSTEM IMPORT
     (* type *)  CARD8, CARD32;
 
-FROM Types IMPORT
+FROM LONGLONG IMPORT
     (* type *)  CARD64;
 
 TYPE HexDigit = [0..15];

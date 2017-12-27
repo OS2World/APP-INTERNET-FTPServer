@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Setup for FtpServer                                                   *)
-(*  Copyright (C) 2015   Peter Moylan                                     *)
+(*  Copyright (C) 2017   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE HideList;
         (*          Dialogue to edit the HideList for one user          *)
         (*                                                              *)
         (*        Started:        27 May 2013                           *)
-        (*        Last edited:    20 December 2015                      *)
+        (*        Last edited:    22 May 2017                           *)
         (*        Status:         Working                               *)
         (*                                                              *)
         (****************************************************************)
@@ -46,7 +46,7 @@ FROM RINIData IMPORT
 
 FROM FileOps IMPORT FilenameString;
 
-FROM Inet2Misc IMPORT
+FROM MiscFuncs IMPORT
     (* type *)  CharArrayPointer;
 
 FROM Storage IMPORT

@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  FtpServer FTP daemon                                                  *)
-(*  Copyright (C) 2016   Peter Moylan                                     *)
+(*  Copyright (C) 2017   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE FDUsers;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            30 August 1997                  *)
-        (*  Last edited:        17 August 2016                  *)
+        (*  Last edited:        15 October 2017                 *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (********************************************************)
@@ -57,11 +57,9 @@ FROM SYSTEM IMPORT ADR, CARD16;
 
 IMPORT FileSys, Strings, SysClock, OS2;
 
-FROM Types IMPORT
-    (* type *)  CARD64;
-
 FROM LONGLONG IMPORT
-    (* const*)  Max64;
+    (* const*)  Max64,
+    (* type *)  CARD64;
 
 FROM LowLevel IMPORT
     (* proc *)  EVAL;
@@ -99,7 +97,7 @@ FROM INIData IMPORT
 FROM MyClock IMPORT
     (* proc *)  CorrectToGMT, CurrentTimeToString;
 
-FROM InetUtilities IMPORT
+FROM MiscFuncs IMPORT
     (* proc *)  AppendString, ConvertCardRJ,
                 ConvertCard64RJ, ConvertCardZ, AddEOL;
 
@@ -1994,6 +1992,8 @@ PROCEDURE SetWorkingDirectory (U: User;  newdir: FName): BOOLEAN;
     (* Changes user to the specified directory.  Returns FALSE if the requested    *)
     (* directory does not exist, or if the user does not have the right to see it. *)
 
+    (* Special case: it is legal to go to the root directory even if it is invisible. *)
+
     VAR k: CARDINAL;  success: BOOLEAN;
         head, vdir: FileNameString;
 
@@ -2001,7 +2001,9 @@ PROCEDURE SetWorkingDirectory (U: User;  newdir: FName): BOOLEAN;
         success := (newdir <> NIL) AND (newdir^.fname[0] = Nul)
                            AND (newdir^.EntryPtr <> NIL)
                            AND newdir^.EntryPtr^.IsADir
-                           AND (Visible IN newdir^.EntryPtr^.flags);
+                           AND ((Visible IN newdir^.EntryPtr^.flags)
+                                OR (newdir^.EntryPtr^.parent = NIL));
+
         IF success THEN
             (* Check the HideList. *)
 
@@ -2570,6 +2572,13 @@ PROCEDURE ListDirectory (S: Socket;  U: User;  KeepAlive: Semaphore;
         buffer: ARRAY [0..127] OF CHAR;  pos: CARDINAL;
 
     BEGIN
+        (* Special case: if the root node is invisible, we allow an empty   *)
+        (* listing to be returned.                                          *)
+
+        IF (arg^.EntryPtr^.parent = NIL) AND NOT (Visible IN arg^.EntryPtr^.flags) THEN
+            EXCL (options, MayExpand);
+        END (*IF*);
+
         NEW (ToDo.head);
         ToDo.tail := ToDo.head;
         ToDo.head^.next := NIL;
@@ -2656,11 +2665,17 @@ PROCEDURE MayListFiles (iname: FName): BOOLEAN;
     (* Returns TRUE iff the user has permission to see a directory listing of   *)
     (* the file(s) implied by iname.                                            *)
 
+    (* Special case: if iname represents the root node, and it is invisible,    *)
+    (* then we allow the listing but arrange that the directory contents will   *)
+    (* not be included in the listing.  Note that this also requires a special  *)
+    (* check in procedure ListDirectory.                                        *)
+
     BEGIN
         IF iname = NIL THEN
             RETURN FALSE;
         ELSE
-            RETURN (Visible IN iname^.EntryPtr^.flags);
+            RETURN (Visible IN iname^.EntryPtr^.flags)
+                        OR (iname^.EntryPtr^.parent = NIL);
         END (*IF*);
     END MayListFiles;
 

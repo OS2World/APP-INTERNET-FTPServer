@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Setup for FtpServer                                                   *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2017   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -29,7 +29,7 @@ IMPLEMENTATION MODULE FSUINI;
         (*   The actual INI file operations are done by RINIData    *)
         (*                                                          *)
         (*      Started:        21 January 2002                     *)
-        (*      Last edited:    7 November 2008                     *)
+        (*      Last edited:    8 October 2017                      *)
         (*      Status:         OK                                  *)
         (*                                                          *)
         (************************************************************)
@@ -37,7 +37,7 @@ IMPLEMENTATION MODULE FSUINI;
 
 IMPORT RINIData, Names, Strings;
 
-FROM Inet2Misc IMPORT
+FROM MiscFuncs IMPORT
     (* proc *)  EVAL;
 
 (************************************************************************)
@@ -97,6 +97,16 @@ PROCEDURE SetHashMax (value: CARDINAL);
     BEGIN
         HashMax := value;
     END SetHashMax;
+
+(************************************************************************)
+
+PROCEDURE IsMultiFileMode(): BOOLEAN;
+
+    (* Returns TRUE iff we are currently using multiple INI files. *)
+
+    BEGIN
+        RETURN HashMax <> 0;
+    END IsMultiFileMode;
 
 (************************************************************************)
 

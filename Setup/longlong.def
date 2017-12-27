@@ -6,18 +6,40 @@ DEFINITION MODULE LONGLONG;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            17 October 2001                 *)
-        (*  Last edited:        28 May 2011                     *)
+        (*  Last edited:        12 November 2017                *)
         (*  Status:             OK                              *)
         (*                                                      *)
         (********************************************************)
 
 
-FROM Types IMPORT CARD64, INT64;
+FROM SYSTEM IMPORT CARD32, INT32;
+
+TYPE
+    CARD64 = RECORD
+                 high, low: CARD32;
+             END (*RECORD*);
+
+    INT64  = RECORD
+                 high: INT32;
+                 low: CARD32;
+             END (*RECORD*);
+
+    (* The following is used only when getting results from *)
+    (* the OS/2 API.                                        *)
+
+    CARD64API = RECORD
+                    low, high: CARD32;
+                END (*RECORD*);
 
 CONST
     Zero64 = CARD64{0, 0};
     Max64 = CARD64{MAX(CARDINAL), MAX(CARDINAL)};
 
+
+
+PROCEDURE IsZero (val: CARD64): BOOLEAN;
+
+    (* Returns TRUE iff val = 0 *)
 
 PROCEDURE Compare64 (A, B: CARD64): INTEGER;
 
@@ -33,6 +55,10 @@ PROCEDURE Sub64 (VAR (*INOUT*) A: CARD64;  B: CARDINAL);
     (* Computes  A := A - B.  This differs from Diff64 (below) in the   *)
     (* type of B, and in the way the result is returned.                *)
 
+PROCEDURE DEC64 (VAR (*INOUT*) A: CARD64);
+
+    (* Decrements A by 1.  *)
+
 PROCEDURE ShortSub (A, B: CARD64): CARDINAL;
 
     (* Returns A-B as a CARDINAL value, or MAX(CARDINAL) in the case of *)
@@ -45,6 +71,10 @@ PROCEDURE Sum64 (A, B: CARD64): CARD64;
 PROCEDURE Diff64 (A, B: CARD64): INT64;
 
     (* Returns A-B. *)
+
+PROCEDURE Mul32 (A, B: CARDINAL): CARD64;
+
+    (* Returns A*B. *)
 
 PROCEDURE Mul64 (A, B: CARD64): CARD64;
 

@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  PMOS/2 software library                                               *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2017   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -32,7 +32,7 @@ IMPLEMENTATION MODULE FileOps;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            17 October 2001                 *)
-        (*  Last edited:        17 April 2015                   *)
+        (*  Last edited:        13 October 2017                 *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (*    The original version of this module used          *)
@@ -51,7 +51,7 @@ FROM SYSTEM IMPORT
     (* type *)  LOC, INT32,
     (* proc *)  ADR, CAST;
 
-FROM Types IMPORT
+FROM LONGLONG IMPORT
     (* type *)  CARD64;
 
 FROM Conversions IMPORT
@@ -931,12 +931,13 @@ PROCEDURE ConvertFindResultL (VAR (*IN*) FindBuffer: OS2A.FILEFINDBUF3L;
     (* Copies the result of a directory lookup to the format we're using. *)
 
     BEGIN
-        D.attr    := CAST (FileAttr, FindBuffer.attrFile);
-        D.timePkd := FindBuffer.ftimeLastWrite;
-        D.datePkd := FindBuffer.fdateLastWrite;
-        D.timeCre := FindBuffer.ftimeCreation;
-        D.dateCre := FindBuffer.fdateCreation;
-        D.size    := FindBuffer.cbFile;
+        D.attr      := CAST (FileAttr, FindBuffer.attrFile);
+        D.timePkd   := FindBuffer.ftimeLastWrite;
+        D.datePkd   := FindBuffer.fdateLastWrite;
+        D.timeCre   := FindBuffer.ftimeCreation;
+        D.dateCre   := FindBuffer.fdateCreation;
+        D.size.high := FindBuffer.cbFile.high;
+        D.size.low  := FindBuffer.cbFile.low;
         Strings.Assign (FindBuffer.achName, D.name);
     END ConvertFindResultL;
 

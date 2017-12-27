@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Setup for FtpServer                                                   *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2017   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -27,7 +27,7 @@ MODULE Setup;
         (*                   PM Setup for FtpServer                 *)
         (*                                                          *)
         (*    Started:        7 October 1999                        *)
-        (*    Last edited:    19 November 2009                      *)
+        (*    Last edited:    18 September 2017                     *)
         (*    Status:         OK                                    *)
         (*                                                          *)
         (************************************************************)
@@ -37,6 +37,9 @@ IMPORT OS2, OS2RTL, FSUINI, OpeningDialogue, CommonSettings, IOChan, TextIO;
 
 FROM PMInit IMPORT
     (* proc *)  OurHab;
+
+FROM RINIData IMPORT
+    (* proc *)  ChooseDefaultINI;
 
 FROM ProgramArgs IMPORT
     (* proc *)  ArgChan, IsArgPresent;
@@ -84,7 +87,6 @@ PROCEDURE GetParameters (VAR (*OUT*) LocalRemote: CARDINAL;
 
     BEGIN
         LocalRemote := 0;
-        UseTNI := FALSE;
         args := ArgChan();
         IF IsArgPresent() THEN
             TextIO.ReadString (args, Options);
@@ -122,6 +124,12 @@ BEGIN
     (* Since signal exceptions are not handled by RTS yet, using module   *)
     (* finalization for clean up is incorrect. This will be changed in the*)
     (* next release.                                                      *)
+
+    IF NOT ChooseDefaultINI ("ftpd", UseTNI) THEN
+        UseTNI := FALSE;
+    END (*IF*);
+
+    (* The value of UseTNI set above can be overriden by user parameters. *)
 
     GetParameters (LocalRemote, UseTNI);
     IF UseTNI THEN

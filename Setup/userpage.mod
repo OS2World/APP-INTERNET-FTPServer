@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Setup for FtpServer                                                   *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2017   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,29 +28,30 @@ IMPLEMENTATION MODULE UserPage;
         (*                 User page of the notebook                    *)
         (*                                                              *)
         (*        Started:        11 October 1999                       *)
-        (*        Last edited:    10 July 2011                          *)
+        (*        Last edited:    14 October 2017                       *)
         (*        Status:         OK                                    *)
         (*                                                              *)
         (****************************************************************)
 
 
-FROM SYSTEM IMPORT ADDRESS, CAST, ADR;
+FROM SYSTEM IMPORT CARD16, ADDRESS, CAST, ADR;
 
-IMPORT OS2, OS2RTL, Strings, DID, BasicPage, EditUser, CommonSettings;
+IMPORT OS2, OS2RTL, Strings, DID, BasicPage, EditUser, CommonSettings, WideUserDialogue, WU2Dialogue;
 
 FROM FSUINI IMPORT
-    (* proc *)  SetINIFileName, SetHashMax, OpenINIFile, OpenINIForUser, CloseINIFile;
+    (* proc *)  SetINIFileName, SetHashMax, IsMultiFileMode,
+                OpenINIFile, OpenINIForUser, CloseINIFile;
 
 FROM RINIData IMPORT
     (* type *)  StringReadState,
-    (* proc *)  ItemSize, INIFetch, INIGetCard,
+    (* proc *)  ItemSize, INIFetch, INIGetCard, INIPut,
                 GetStringList, NextString, CloseStringList, INIDeleteApp;
 
 FROM FileOps IMPORT
     (* type *)  DirectoryEntry,
     (* proc *)  FirstDirEntry, NextDirEntry, DirSearchDone;
 
-FROM Inet2Misc IMPORT
+FROM MiscFuncs IMPORT
     (* type *)  CharArrayPointer,
     (* proc *)  EVAL, ConvertCard;
 
@@ -60,19 +61,23 @@ FROM LowLevel IMPORT
 FROM Storage IMPORT
     (* proc *)  ALLOCATE, DEALLOCATE;
 
-(**************************************************************************)
+(************************************************************************)
 
 CONST
     Nul = CHR(0);
     NameLength = 256;
+
+TYPE
+    NameString = ARRAY [0..NameLength-1] OF CHAR;
 
 VAR
     pagehandle: OS2.HWND;
     UserCount: CARDINAL;
     UseTNI, ChangeInProgress: BOOLEAN;
 
-(**************************************************************************)
+(************************************************************************)
 
+(*
 PROCEDURE CardToHex (N: CARDINAL;  VAR (*OUT*) text: ARRAY OF CHAR);
 
     (* For debugging.  32-bit cardinal to 8-char hexadecimal. *)
@@ -92,7 +97,7 @@ PROCEDURE CardToHex (N: CARDINAL;  VAR (*OUT*) text: ARRAY OF CHAR);
         END (*FOR*);
     END CardToHex;
 
-(**************************************************************************)
+(************************************************************************)
 
 PROCEDURE WriteHex (hwnd: OS2.HWND;  to: CARDINAL;  N: CARDINAL);
 
@@ -110,8 +115,9 @@ PROCEDURE WriteHex (hwnd: OS2.HWND;  to: CARDINAL;  N: CARDINAL);
         END (*IF*);
         OS2.WinSetWindowText (w, text);
     END WriteHex;
+*)
 
-(**************************************************************************)
+(************************************************************************)
 
 PROCEDURE DisplayUserCount (hwnd: OS2.HWND);
 
@@ -127,93 +133,90 @@ PROCEDURE DisplayUserCount (hwnd: OS2.HWND);
         OS2.WinSetDlgItemText (hwnd, DID.UserCount, buffer);
     END DisplayUserCount;
 
-(**************************************************************************)
+(************************************************************************)
+(*                   LOADING AND STORING THE LIST OF NAMES              *)
+(************************************************************************)
 
-PROCEDURE AddDetail (VAR (*INOUT*) name: ARRAY OF CHAR);
+TYPE NameList = POINTER TO
+                    RECORD
+                        next:   NameList;
+                        seqnum: CARD16;
+                        name:   NameString;
+                    END (*RECORD*);
 
-    (* Appends the user category, in parentheses, to a username.  We    *)
-    (* assume that the INI file is open.                                *)
+(************************************************************************)
 
-    TYPE UserCategory = (NoSuchUser, NoPasswordNeeded, GuestUser,
-                                NormalUser, Manager, UserTemplate);
+PROCEDURE SortList (VAR (*INOUT*) list: NameList;  N: CARDINAL);
 
-    VAR size: CARDINAL;
-        category: UserCategory;
-        found, Active: BOOLEAN;
-        label: ARRAY [0..15] OF CHAR;
+    (* Sorts list of N elements in increasing order of seqnum.  *)
 
-    BEGIN
-        (* First check whether user exists. *)
-
-        IF (name[0] = Nul) OR (name[0] = '$') THEN
-            found := FALSE;
-        ELSE
-            found := ItemSize(name, '', size) AND (size <> 0);
-        END (*IF*);
-        category := NormalUser;
-        Active := TRUE;
-
-        IF found THEN
-            IF (NOT INIFetch (name, "Category", category))
-                           OR (category = NoSuchUser) THEN
-                category := NormalUser;
-            END (*IF*);
-            IF NOT INIFetch (name, "Active", Active) THEN
-                Active := TRUE;
-            END (*IF*);
-        END (*IF*);
-
-        CASE category OF
-             NoSuchUser:        label := "invalid";
-          |  NoPasswordNeeded:  label := "no password";
-          |  GuestUser:         label := "guest";
-          |  NormalUser:        label := "user";
-          |  Manager:           label := "manager";
-          |  UserTemplate:      label := "template";
-           ELSE
-                                label := "unknown";
-        END (*CASE*);
-
-        Strings.Append (" (", name);
-        Strings.Append (label, name);
-        IF NOT Active THEN
-            Strings.Append (", inactive", name);
-        END (*IF*);
-        Strings.Append (")", name);
-
-    END AddDetail;
-
-(**************************************************************************)
-
-PROCEDURE StripDetail (VAR (*INOUT*) name: ARRAY OF CHAR);
-
-    (* Removes the user category from name, by deleting everything      *)
-    (* from " (" onwards.                                               *)
-
-    VAR pos: CARDINAL;  found: BOOLEAN;
+    VAR j: CARDINAL;
+        list2, prev, current: NameList;
 
     BEGIN
-        Strings.FindNext (" (", name, 0, found, pos);
-        IF found THEN
-            name[pos] := Nul;
+        IF N < 2 THEN
+            RETURN;
         END (*IF*);
-    END StripDetail;
 
-(**************************************************************************)
+        (* Split the list into two sublists. *)
+
+        current := list;  prev := NIL;
+        FOR j := 0 TO (N-2) DIV 2 DO
+            prev := current;
+            current := current^.next;
+        END (*FOR*);
+        list2 := current;
+        prev^.next := NIL;
+
+        (* Sort the two sublists. *)
+
+        SortList (list, N DIV 2);
+        SortList (list2, N - N DIV 2);
+
+        (* Merge the two sorted lists. *);
+
+        prev := NIL;
+        current := list;
+        WHILE list2 <> NIL DO
+            WHILE (current <> NIL) AND (current^.seqnum < list2^.seqnum) DO
+                prev := current;
+                current := current^.next;
+            END (*WHILE*);
+
+            IF prev = NIL THEN
+                list := list2;
+            ELSE
+                prev^.next := list2;
+            END (*IF*);
+            prev := list2;
+            list2 := current;
+            current := prev^.next;
+
+        END (*WHILE*);
+
+    END SortList;
+
+(************************************************************************)
 
 PROCEDURE LoadValues (hwnd: OS2.HWND);
 
-    (* Fills the user list with data from the INI files.  Note that there *)
-    (* can be multiple INI files depending on the 'HashMax' INI value.    *)
+    (* Fills the user list with data from the INI files.  Note that     *)
+    (* there can be multiple INI files depending on the 'HashMax' INI   *)
+    (* value.  The order in which we will put the entries into the      *)
+    (* listbox will depend on recorded sequence numbers, which          *)
+    (* unfortunately adds to the complexity of this procedure.          *)
 
     VAR D: DirectoryEntry;
         state: StringReadState;
-        appname:  ARRAY [0..NameLength+19] OF CHAR;
+        username:  NameString;
         mask: ARRAY [0..127] OF CHAR;
         N: CARDINAL;
-        MultiFileMode, found: BOOLEAN;
+        found, MultiFileMode: BOOLEAN;
+        list, current, next, tail: NameList;
 
     BEGIN
+        UserCount := 0;
+        list := NIL;  tail := NIL;
         OpenINIFile;
         MultiFileMode := INIGetCard ('$SYS', 'HashMax', N) AND (N > 0);
         SetHashMax (N);
@@ -238,23 +241,36 @@ PROCEDURE LoadValues (hwnd: OS2.HWND);
                 OpenINIFile;
             END (*IF*);
 
-            (* Process all the application names in this file. *)
+            (* Collect all the usernames in this file. *)
 
             GetStringList ('', '', state);
             LOOP
-                NextString (state, appname);
-                IF appname[0] = Nul THEN
+                NextString (state, username);
+                IF username[0] = Nul THEN
 
                     EXIT (*LOOP*);
 
-                ELSIF appname[0] <> '$' THEN
+                ELSIF (username[0] <> '$') AND (username[0] <> '?') THEN
 
-                    (* Add name to the listbox. *)
+                    (* Add the name to our list. *)
 
                     INC (UserCount);
-                    AddDetail (appname);
-                    OS2.WinSendDlgItemMsg (hwnd, DID.userlist, OS2.LM_INSERTITEM,
-                             OS2.MPFROMSHORT(OS2.LIT_SORTASCENDING), ADR(appname));
+                    NEW (current);
+                    current^.next := NIL;
+                    Strings.Assign (username, current^.name);
+
+                    (* Get sequence number. *)
+
+                    IF NOT INIFetch (current^.name, "seqnum", current^.seqnum) THEN
+                        current^.seqnum := MAX(CARD16);
+                    END (*IF*);
+
+                    IF tail = NIL THEN
+                        list := current;
+                    ELSE
+                        tail^.next := current;
+                    END (*IF*);
+                    tail := current;
 
                 END (*IF*);
 
@@ -268,6 +284,9 @@ PROCEDURE LoadValues (hwnd: OS2.HWND);
 
         IF MultiFileMode THEN
             DirSearchDone (D);
+
+            (* Restore the original INI file name. *)
+
             IF UseTNI THEN
                 mask := "FTPD.TNI";
             ELSE
@@ -276,19 +295,117 @@ PROCEDURE LoadValues (hwnd: OS2.HWND);
             SetINIFileName (mask, UseTNI);
         END (*IF*);
 
+        (* At this point we have collected all usernames in all of our  *)
+        (* INI files, but we still haven't put them into the listbox.   *)
+        (* That has been delayed until now because we want to look up   *)
+        (* sequence numbers to work out the order.                      *)
+
+        (* It looks as if the listbox doesn't like out-of-order         *)
+        (* insertions, so we need to sort the list before doing the     *)
+        (* listbox insertions.  Note that the sort will put all entries *)
+        (* without sequence numbers at the end of the list.             *)
+
+        SortList (list, UserCount);
+
+        (* Now that we have entries in the correct order, put them in   *)
+        (* the listbox.  The sequence numbers are no longer needed,     *)
+        (* because they will be recalculated at a later stage.          *)
+
+        current := list;
+        WHILE current <> NIL DO
+            next := current^.next;
+            Strings.Assign (current^.name, username);
+            DISPOSE (current);
+
+            (* Add name to the listbox. *)
+
+            OS2.WinSendDlgItemMsg (hwnd, DID.userlist, OS2.LM_INSERTITEM,
+                     OS2.MPFROMSHORT(OS2.LIT_END), ADR(username));
+            current := next;
+        END (*WHILE*);
+
+        (* By now the list should be empty. *)
+
     END LoadValues;
 
-(**************************************************************************)
+(************************************************************************)
 
 PROCEDURE StoreData (hwnd: OS2.HWND);
 
-    (* A do-nothing procedure - INI file updating is done as part of    *)
-    (* the button processing.                                           *)
+    (* Most of the INI file updating is done as part of the button      *)
+    (* processing, but we take the opportunity to assign user sequence  *)
+    (* numbers as Setup is about to exit.  That will ensure that the    *)
+    (* next time we run setup the order will be unchanged.              *)
+
+    CONST Skip = MAX(CARD16);
+
+    VAR lbox: OS2.HWND;
+        j, k, N: CARDINAL;
+        name: NameString;
+        list, p, tail: NameList;
 
     BEGIN
+        lbox := OS2.WinWindowFromID(hwnd,DID.userlist);
+
+        (* Work out how many users there are in the list. *)
+
+        N := CAST(CARDINAL, OS2.WinSendMsg (lbox, OS2.LM_QUERYITEMCOUNT, NIL, NIL));
+        IF N = 0 THEN RETURN END(*IF*);
+
+        (* Read the listbox into the NameList, assign sequence numbers. *)
+        (* Skip any entries for which name = "?".                       *)
+
+        k := 0;
+        NEW (list);  list^.seqnum := Skip;  tail := list;
+        FOR j := 0 TO N-1 DO
+            EVAL (OS2.WinSendMsg (lbox, OS2.LM_QUERYITEMTEXT,
+                            OS2.MPFROM2SHORT(j, NameLength), ADR(name)));
+            IF name[0] <> '?' THEN
+                tail^.name := name;
+                tail^.seqnum := k;
+                INC (k);
+                NEW (tail^.next);
+                tail := tail^.next;
+            END (*IF*);
+        END (*FOR*);
+        tail^.next := NIL;
+
+        (* Now store sequence numbers from the linked list to the INI   *)
+        (* file(s).  A sequence number of MAX(CARD16) means that we     *)
+        (* have already dealt with this entry.                          *)
+
+        WHILE list <> NIL DO
+            IF list^.seqnum <> Skip THEN
+                name := list^.name;
+                IF name[0] <> '?' THEN
+                    OpenINIForUser (name);
+                    INIPut (name, "seqnum", list^.seqnum);
+
+                    (* Deal with any other users in this INI file. *)
+
+                    p := list^.next;
+                    WHILE p <> NIL DO
+                        IF (p^.seqnum <> Skip)
+                                    AND ItemSize (p^.name, '', k)
+                                                    AND (k <> 0) THEN
+                            INIPut (p^.name, "seqnum", p^.seqnum);
+                            p^.seqnum := Skip;
+                        END (*IF*);
+                        p := p^.next;
+                    END (*WHILE*);
+                    CloseINIFile;
+                END (*IF*);
+            END (*IF*);
+            p := list^.next;
+            DISPOSE (list);
+            list := p;
+        END (*WHILE*);
+
     END StoreData;
 
-(**************************************************************************)
+(************************************************************************)
+(*                        ENABLE/DISABLE BUTTONS                        *)
+(************************************************************************)
 
 PROCEDURE ItemSelected (hwnd: OS2.HWND;  selected: BOOLEAN);
 
@@ -308,7 +425,9 @@ PROCEDURE ItemSelected (hwnd: OS2.HWND;  selected: BOOLEAN);
         END (*IF*);
     END ItemSelected;
 
-(**************************************************************************)
+(************************************************************************)
+(*                          THE DIALOGUE PROCEDURE                      *)
+(************************************************************************)
 
 PROCEDURE ["SysCall"] DialogueProc(hwnd     : OS2.HWND
                      ;msg      : OS2.ULONG
@@ -318,7 +437,7 @@ PROCEDURE ["SysCall"] DialogueProc(hwnd     : OS2.HWND
         index: INTEGER;
         code: CARDINAL;
         listwindow: OS2.HWND;
-        name: ARRAY [0..NameLength+19] OF CHAR;
+        name: NameString;
 
     BEGIN
         IF msg = OS2.WM_INITDLG THEN
@@ -351,7 +470,6 @@ PROCEDURE ["SysCall"] DialogueProc(hwnd     : OS2.HWND
                    IF EditUser.Edit(listwindow, name, FALSE) THEN
                        (* We have a new entry. *)
                        OpenINIForUser (name);
-                       AddDetail (name);
                        CloseINIFile;
                        OS2.WinSendMsg (listwindow, OS2.LM_SETITEMTEXT,
                                    OS2.MPFROMSHORT(index), ADR(name));
@@ -366,10 +484,8 @@ PROCEDURE ["SysCall"] DialogueProc(hwnd     : OS2.HWND
               | DID.CloneUserButton:
                    OS2.WinSendMsg (listwindow, OS2.LM_QUERYITEMTEXT,
                                    OS2.MPFROM2USHORT(index, 32), ADR(name));
-                   StripDetail (name);
                    IF EditUser.Edit(listwindow, name, TRUE) THEN
                        OpenINIForUser (name);
-                       AddDetail (name);
                        CloseINIFile;
                        INC (index);
                        OS2.WinSendDlgItemMsg (hwnd, DID.userlist, OS2.LM_INSERTITEM,
@@ -383,11 +499,9 @@ PROCEDURE ["SysCall"] DialogueProc(hwnd     : OS2.HWND
               | DID.EditUserButton:
                    OS2.WinSendMsg (listwindow, OS2.LM_QUERYITEMTEXT,
                                    OS2.MPFROM2USHORT(index, 32), ADR(name));
-                   StripDetail (name);
                    EVAL (EditUser.Edit(listwindow, name, FALSE));
                    (* Name or category might have changed. *)
                    OpenINIForUser (name);
-                   AddDetail (name);
                    CloseINIFile;
                    OS2.WinSendMsg (listwindow, OS2.LM_SETITEMTEXT,
                                OS2.MPFROMSHORT(index), ADR(name));
@@ -399,13 +513,22 @@ PROCEDURE ["SysCall"] DialogueProc(hwnd     : OS2.HWND
                                           OS2.MPFROMSHORT(index), NIL);
                    ItemSelected (hwnd, FALSE);
                    IF name[0] <> Nul THEN
-                       StripDetail (name);
                        OpenINIForUser (name);
                        INIDeleteApp (name);
                        CloseINIFile;
                        DEC (UserCount);
                        DisplayUserCount (hwnd);
                    END (*IF*);
+
+              | DID.SortButton:
+                   OS2.WinSendDlgItemMsg (hwnd, DID.userlist, OS2.LM_SELECTITEM,
+                                          OS2.MPFROMSHORT(OS2.LIT_NONE), NIL);
+                   WideUserDialogue.SortDlg (hwnd, listwindow);
+
+              | DID.SortButton2:
+                   OS2.WinSendDlgItemMsg (hwnd, DID.userlist, OS2.LM_SELECTITEM,
+                                          OS2.MPFROMSHORT(OS2.LIT_NONE), NIL);
+                   WU2Dialogue.SortDlg (hwnd, listwindow);
 
             ELSE
                 RETURN OS2.WinDefDlgProc(hwnd, msg, mp1, mp2);
@@ -475,7 +598,7 @@ PROCEDURE ["SysCall"] DialogueProc(hwnd     : OS2.HWND
         END (*CASE*);
     END DialogueProc;
 
-(**************************************************************************)
+(************************************************************************)
 
 PROCEDURE CreatePage (notebook: OS2.HWND;  TNImode: BOOLEAN;
                                 VAR (*OUT*) PageID: CARDINAL): OS2.HWND;
@@ -501,7 +624,7 @@ PROCEDURE CreatePage (notebook: OS2.HWND;  TNImode: BOOLEAN;
         RETURN pagehandle;
     END CreatePage;
 
-(**************************************************************************)
+(************************************************************************)
 
 PROCEDURE SetFont (VAR (*IN*) name: CommonSettings.FontName);
 
@@ -513,7 +636,7 @@ PROCEDURE SetFont (VAR (*IN*) name: CommonSettings.FontName);
         OS2.WinSetPresParam (pagehandle, OS2.PP_FONTNAMESIZE, bufsize, name);
     END SetFont;
 
-(**************************************************************************)
+(************************************************************************)
 
 BEGIN
     UseTNI := FALSE;

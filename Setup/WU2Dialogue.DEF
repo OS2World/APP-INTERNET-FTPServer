@@ -1,0 +1,22 @@
+DEFINITION MODULE WU2Dialogue;
+
+        (************************************************************)
+        (*                                                          *)
+        (*                  PM Setup for FtpServer                  *)
+        (*                     User sort dialogue                       *)
+        (*                                                          *)
+        (*    Started:        19 September 2017                     *)
+        (*    Last edited:    19 September 2017                     *)
+        (*    Status:         OK                                    *)
+        (*                                                          *)
+        (************************************************************)
+
+
+FROM OS2 IMPORT HWND;
+
+PROCEDURE SortDlg (owner, list: HWND);
+
+    (* Run dialogue to allow sorting of the usernames in list.  *)
+
+END WU2Dialogue.
+

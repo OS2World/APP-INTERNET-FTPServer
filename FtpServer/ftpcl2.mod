@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Text-mode monitor for FtpServer                                       *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2017   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE FtpCl2;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            28 October 1997                 *)
-        (*  Last edited:        2 September 2014                *)
+        (*  Last edited:        22 May 2017                     *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (********************************************************)
@@ -60,7 +60,7 @@ FROM INIData IMPORT
     (* proc *)  OpenINIFile, CloseINIFile, INIValid,
                 INIDeleteKey, INIGet, INIGetString, INIPut, INIPutString, INIPutBinary;
 
-FROM InetUtilities IMPORT
+FROM Inet2Misc IMPORT
     (* proc *)  Swap2, Swap4, IPToString;
 
 FROM MaintenancePages IMPORT

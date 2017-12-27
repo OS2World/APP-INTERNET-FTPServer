@@ -6,7 +6,7 @@ DEFINITION MODULE Misc;
         (*                 Miscellaneous procedures             *)
         (*                                                      *)
         (*    Started:        29 March 2000                     *)
-        (*    Last edited:    1 June 2011                       *)
+        (*    Last edited:    8 October 2017                    *)
         (*    Status:         OK                                *)
         (*                                                      *)
         (********************************************************)
@@ -15,7 +15,7 @@ DEFINITION MODULE Misc;
 FROM SYSTEM IMPORT
     (* type *)  LOC, CARD16, CARD32;
 
-FROM Types IMPORT
+FROM LONGLONG IMPORT
     (* type *)  CARD64;
 
 

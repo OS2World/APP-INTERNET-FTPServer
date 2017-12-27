@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  FtpServer FTP daemon                                                  *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2017   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE FtpdSession;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            21 August 1997                  *)
-        (*  Last edited:        27 March 2014                   *)
+        (*  Last edited:        22 November 2017                *)
         (*  Status:             OK                              *)
         (*                                                      *)
         (********************************************************)
@@ -36,7 +36,7 @@ IMPLEMENTATION MODULE FtpdSession;
 
 IMPORT STextIO;   (* while debugging *)
 
-FROM SYSTEM IMPORT ADDRESS;
+FROM SYSTEM IMPORT CARD32, INT32, ADDRESS;
 
 IMPORT ChanConsts, RndFile, IOChan, Strings;
 
@@ -71,8 +71,11 @@ FROM TransLog IMPORT
 FROM Conversions IMPORT
     (* proc *)  CardinalToString;
 
-FROM InetUtilities IMPORT
-    (* proc *)  ConvertCard, AddEOL, IPToString;
+FROM MiscFuncs IMPORT
+    (* proc *)  ConvertCard, AddEOL;
+
+FROM Inet2Misc IMPORT
+    (* proc *)  IPToString;
 
 FROM SplitScreen IMPORT
     (* proc *)  WriteStringAt;
@@ -221,10 +224,12 @@ PROCEDURE SetTimeout (seconds: CARDINAL);
     (* Specifies how long a session can be idle before it is forcibly   *)
     (* closed.                                                          *)
 
+    CONST limit = (MAX(CARD32)-1) DIV 1000;
+
     BEGIN
         Obtain (MaxTimeLock);
-        IF seconds > MAX(CARDINAL) DIV 1000 THEN
-            MaxTime := MAX(CARDINAL);
+        IF seconds > limit THEN
+            MaxTime := MAX(CARD32)-1;
         ELSE
             MaxTime := 1000*seconds;
         END (*IF*);

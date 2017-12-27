@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Setup for FtpServer                                                   *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2017   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE IPFilters;
         (*             Manipulation of IP filter elements               *)
         (*                                                              *)
         (*        Started:        11 September 2008                     *)
-        (*        Last edited:    21 April 2011                         *)
+        (*        Last edited:    22 May 2017                           *)
         (*        Status:         Updated to more record types          *)
         (*                                                              *)
         (****************************************************************)
@@ -44,9 +44,12 @@ FROM FSUINI IMPORT
 FROM RINIData IMPORT
     (* proc *)  INIPutBinary, ItemSize, INIFetchBinary;
 
-FROM Inet2Misc IMPORT
+FROM MiscFuncs IMPORT
     (* type *)  LocArrayPointer,
-    (* proc *)  Swap4, ConvertCard;
+    (* proc *)  ConvertCard;
+
+FROM Inet2Misc IMPORT
+    (* proc *)  Swap4;
 
 FROM LowLevel IMPORT
     (* proc *)  IAND;
