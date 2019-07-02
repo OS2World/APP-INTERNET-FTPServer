@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  FtpServer FTP daemon                                                  *)
-(*  Copyright (C) 2017   Peter Moylan                                     *)
+(*  Copyright (C) 2018   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE FtpCommands;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            23 August 1997                  *)
-        (*  Last edited:        26 November 2017                *)
+        (*  Last edited:        15 December 2018                *)
         (*  Status:             All commands implemented        *)
         (*                                                      *)
         (********************************************************)
@@ -61,10 +61,10 @@ IMPLEMENTATION MODULE FtpCommands;
 (*                                                                              *)
 (* The commmands I have implemented and tested are:                             *)
 (*                                                                              *)
-(*      ABOR, ACCT, ALLO, APPE, CDUP, CWD, DELE, FEAT, HELP, LANG, LIST, MDTM,  *)
-(*      MKD, MODE (S only), NLST, NOOP, OPTS, PASS, PASV, PORT, PWD, QUIT,      *)
-(*      REIN, REST, RETR, RMD, RNFR, RNTO, SITE, SIZE, SMNT, STAT, STOR, STOU,  *)
-(*      STRU (F or R), SYST, TYPE (I or A or L 8 or U), USER                    *)
+(*      ABOR, ACCT, ALLO, APPE, CDUP, CLNT, CSID, CWD, DELE, FEAT, HELP, LANG,  *)
+(*      LIST, MDTM, MKD, MODE (S only), NLST, NOOP, OPTS, PASS, PASV, PORT,     *)
+(*      PWD, QUIT, REIN, REST, RETR, RMD, RNFR, RNTO, SITE, SIZE, SMNT, STAT,   *)
+(*      STOR, STOU, STRU (F or R), SYST, TYPE (I or A or L 8 or U), USER        *)
 (*                                                                              *)
 (* I've also implemented the obsolete commands XCUP, XCWD, XMKD, XPWD, and      *)
 (* XRMD, which are used by some pre-1985 clients (e.g. Windows XP).             *)
@@ -74,6 +74,7 @@ IMPLEMENTATION MODULE FtpCommands;
 (* The draft expires in January 2009.                                           *)
 (*                                                                              *)
 (* Also added: SITE UTIME   (not covered by a standard)                         *)
+(*             CLNT, CSID   (not covered by a standard)                         *)
 (*             HOST         (RFC 7151)                                          *)
 (*             EPRT, EPSV   (RFC 2428)                                          *)
 (*                                                                              *)
@@ -83,7 +84,7 @@ FROM SYSTEM IMPORT CARD8, CARD16, CARD32, CAST, ADDRESS, ADR;
 
 IMPORT Strings, IOChan, ChanConsts, RndFile, OS2, FileOps;
 
-FROM LONGLONG IMPORT
+FROM Arith64 IMPORT
     (* const*)  Zero64, Max64,
     (* type *)  CARD64,
     (* proc *)  Compare64;
@@ -134,6 +135,9 @@ FROM FtpTransfers IMPORT
 
 FROM FDUsers IMPORT
     (* type *)  UserCategory;
+
+FROM FV IMPORT
+    (* const*)  version;
 
 FROM FileOps IMPORT
     (* const*)  NoSuchChannel,
@@ -218,8 +222,8 @@ TYPE
     (* Commands, for the command parser. *)
 
     CmdType = (unknown, notloggedin,
-               abor, acct, allo, appe, cdup, cwd, dele, eprt, epsv, feat,
-               help, host, lang, list,
+               abor, acct, allo, appe, cdup, clnt, csid, cwd, dele, eprt,
+               epsv, feat, help, host, lang, list,
                mdtm, mkd, mode, nlst, noop, opts, pasw, pass, pasv, port, pwd,
                quit, rein, rest, retr, rmd, rnfr, rnto, site, size, smnt, stat,
                stor, stou, stru, syst, type, user, xcup, xcwd, xmkd, xpwd, xrmd);
@@ -230,7 +234,8 @@ TYPE
 
 CONST
     KeywordList = KeywordArray {'????', '????',
-                               'ABOR', 'ACCT', 'ALLO', 'APPE', 'CDUP', 'CWD ',
+                               'ABOR', 'ACCT', 'ALLO', 'APPE', 'CDUP', 'CLNT',
+                               'CSID', 'CWD ',
                                'DELE', 'EPRT', 'EPSV', 'FEAT', 'HELP', 'HOST',
                                'LANG', 'LIST',
                                'MDTM', 'MKD ', 'MODE', 'NLST', 'NOOP', 'OPTS',
@@ -827,6 +832,29 @@ PROCEDURE CDUP (session: Session;  VAR (*IN*) dummy: ARRAY OF CHAR);
 
 (********************************************************************************)
 
+PROCEDURE CLNT (session: Session;  VAR (*IN*) arg: ARRAY OF CHAR);
+
+    BEGIN
+        arg[0] := arg[0];    (* To avoid a compiler warning. *)
+        Reply (session, "202 Should I care who you are?");
+    END CLNT;
+
+(********************************************************************************)
+
+PROCEDURE CSID (session: Session;  VAR (*IN*) arg: ARRAY OF CHAR);
+
+    VAR response: ARRAY [0..63] OF CHAR;
+
+    BEGIN
+        arg[0] := arg[0];    (* To avoid a compiler warning. *)
+        response := "200 Name=FtpServer;Version=";
+        Strings.Append (version, response);
+        Strings.Append (";OS=OS/2;CaseSensitive=0; ", response);
+        Reply (session, response);
+    END CSID;
+
+(********************************************************************************)
+
 PROCEDURE CWD (session: Session;  VAR (*IN*) Params: ARRAY OF CHAR);
 
     BEGIN
@@ -978,6 +1006,8 @@ PROCEDURE FEAT (session: Session;  VAR (*IN*) dummy: ARRAY OF CHAR);
         dummy[0] := dummy[0];    (* To avoid a compiler warning. *)
 
         Reply (session, "211-Extensions supported:");
+        Reply (session, " CLNT");
+        Reply (session, " CSID");
         Reply (session, " EPRT");
         Reply (session, " EPSV");
         Reply (session, " HOST");
@@ -1000,20 +1030,30 @@ PROCEDURE FEAT (session: Session;  VAR (*IN*) dummy: ARRAY OF CHAR);
 
 (********************************************************************************)
 
-PROCEDURE HELP (session: Session;  VAR (*IN*) dummy: ARRAY OF CHAR);
+PROCEDURE HELP (session: Session;  VAR (*IN*) arg: ARRAY OF CHAR);
 
     BEGIN
-        dummy[0] := dummy[0];    (* To avoid a compiler warning. *)
-
-        Reply (session, "214-The following commands are recognized.");
-        Reply (session, "   ABOR    ACCT    ALLO    APPE    CDUP    CWD     DELE");
-        Reply (session, "   EPRT    EPSV    FEAT    HELP    HOST    LANG    LIST");
-        Reply (session, "   MDTM    MKD     MODE    NLST    NOOP    OPTS    PASS");
-        Reply (session, "   PASV    PORT    PWD     QUIT    REIN    REST    RETR");
-        Reply (session, "   RMD     RNFR    RNTO    SITE    SIZE    SMNT    STAT");
-        Reply (session, "   STOR    STOU    STRU    SYST    TYPE    USER    XCUP");
-        Reply (session, "   XCWD    XMKD    XPWD    XRMD");
-        Reply (session, "214 End of list.");
+        IF StringMatch (arg, "SITE") THEN
+            Reply (session, "214-The following SITE commands are recognized.");
+            Reply (session, "   SITE MNGR EXEC");
+            Reply (session, "   SITE MNGR EXIT");
+            Reply (session, "   SITE MNGR GXIT");
+            Reply (session, "   SITE MNGR LIST");
+            Reply (session, "   SITE MNGR KILL");
+            Reply (session, "   SITE PERM");
+            Reply (session, "   SITE UTIME");
+            Reply (session, "214 Some of these require manager privilege.");
+        ELSE
+            Reply (session, "214-The following commands are recognized.");
+            Reply (session, "   ABOR    ACCT    ALLO    APPE    CDUP    CLNT    CSID");
+            Reply (session, "   CWD     DELE    EPRT    EPSV    FEAT    HELP    HOST");
+            Reply (session, "   LANG    LIST    MDTM    MKD     MODE    NLST    NOOP");
+            Reply (session, "   OPTS    PASS    PASV    PORT    PWD     QUIT    REIN");
+            Reply (session, "   REST    RETR    RMD     RNFR    RNTO    SITE    SIZE");
+            Reply (session, "   SMNT    STAT    STOR    STOU    STRU    SYST    TYPE");
+            Reply (session, "   USER    XCUP    XCWD    XMKD    XPWD    XRMD");
+            Reply (session, "214 End of list.");
+        END (*IF*);
 
     END HELP;
 
@@ -1244,7 +1284,7 @@ PROCEDURE OPTS (session: Session;  VAR (*IN*) command: ARRAY OF CHAR);
                     Reply (session, "501 Cannot use OPTS with this command.");
                     result := done;
            |
-               pass, user:
+               clnt, csid, pass, user:
                     IF command[0] = Nul THEN
                         Reply (session, "501 A character string is required.");
                         result := done;
@@ -2140,7 +2180,7 @@ TYPE
 
 CONST
     HandlerList = HandlerArray {NoSuchCommand, NotLoggedIn,
-                               ABOR, ACCT, ALLO, APPE, CDUP, CWD,
+                               ABOR, ACCT, ALLO, APPE, CDUP, CLNT, CSID, CWD,
                                DELE, EPRT, EPSV, FEAT, HELP, HOST, LANG,
                                LIST, MDTM, MKD, MODE,
                                NLST, NOOP, OPTS, PASV, PASS, PASV, PORT,

@@ -7,14 +7,14 @@ DEFINITION MODULE MiscFuncs;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            21 May 2017                     *)
-        (*  Last edited:        6 October 2017                  *)
+        (*  Last edited:        26 January 2018                 *)
         (*  Status:             OK                              *)
         (*                                                      *)
         (********************************************************)
 
 
 FROM SYSTEM IMPORT LOC;
-FROM LONGLONG IMPORT CARD64;
+FROM Arith64 IMPORT CARD64;
 FROM FileOps IMPORT ChanId;
 
 

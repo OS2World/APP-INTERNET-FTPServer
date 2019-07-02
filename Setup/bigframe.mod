@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Setup for FtpServer                                                   *)
-(*  Copyright (C) 2017   Peter Moylan                                     *)
+(*  Copyright (C) 2019   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE BigFrame;
         (*             The settings notebook and its frame          *)
         (*                                                          *)
         (*    Started:        8 October 1999                        *)
-        (*    Last edited:    12 September 2017                     *)
+        (*    Last edited:    16 March 2019                         *)
         (*    Status:         OK                                    *)
         (*                                                          *)
         (************************************************************)
@@ -129,6 +129,7 @@ PROCEDURE InitialiseNotebook (hwnd: OS2.HWND);
         owner: OS2.HWND;  hini: INIData.HINI;
         NewStyle: BOOLEAN;
         app: ARRAY [0..12] OF CHAR;
+        colour, background: CARDINAL;
 
     BEGIN
         (* Find OS version to decide what notebook style to use. *)
@@ -157,10 +158,14 @@ PROCEDURE InitialiseNotebook (hwnd: OS2.HWND);
         scale := 2*swp.cx DIV 19;
         OS2.WinSendMsg (hwnd, OS2.BKM_SETDIMENSIONS,
              OS2.MPFROM2SHORT(scale,scale DIV 2), OS2.MPFROMSHORT(OS2.BKA_MAJORTAB));
+        colour := 00FFFFAAH(*0055DBFFH*);
+        background := OS2.BKA_BACKGROUNDPAGECOLOR;
         OS2.WinSendMsg (hwnd, OS2.BKM_SETNOTEBOOKCOLORS,
-                        CAST(ADDRESS,00FFFFAAH(*0055DBFFH*)), CAST(ADDRESS,OS2.BKA_BACKGROUNDPAGECOLOR));
+                        CAST (ADDRESS, colour), CAST(ADDRESS,background));
+        colour := 0080DBAAH;
+        background := OS2.BKA_BACKGROUNDPAGECOLOR;
         OS2.WinSendMsg (hwnd, OS2.BKM_SETNOTEBOOKCOLORS,
-                        CAST(ADDRESS,0080DBAAH), CAST(ADDRESS,OS2.BKA_BACKGROUNDMAJORCOLOR));
+                        CAST(ADDRESS,colour), CAST(ADDRESS,background));
 
         pagehandle[1] := BasicPage.CreatePage(hwnd, UseTNI, IDofPage[1]);
         pagehandle[2] := LogPage.CreatePage(hwnd, IDofPage[2]);
@@ -259,21 +264,30 @@ PROCEDURE ["SysCall"] MainDialogueProc(hwnd     : OS2.HWND
     VAR bookwin: OS2.HWND;
         pageID: CARDINAL;  pg: Page;
         hini: INIData.HINI;
+        stringval, filename: ARRAY [0..255] OF CHAR;
         app: ARRAY [0..12] OF CHAR;
 
     BEGIN
         CASE msg OF
            |  OS2.WM_INITDLG:
                    SetInitialWindowPosition (hwnd, INIFileName, "BigFrame", UseTNI);
+                   IF UseTNI THEN
+                       filename := "FTPD.TNI";
+                   ELSE
+                       filename := "FTPD.INI";
+                   END (*IF*);
                    IF RemoteOperation() THEN
                        IF SelectRemoteFile('FTPD.INI') THEN
-                           OS2.WinSetWindowText (hwnd, "Remote FtpServer Setup");
+                           Strings.Assign ("Remote FtpServer Setup", stringval);
                        ELSE
-                           OS2.WinSetWindowText (hwnd, "Can't open remote INI file");
+                           Strings.Assign ("Can't open remote INI file", stringval);
                        END (*IF*);
                    ELSE
-                       OS2.WinSetWindowText (hwnd, "Local FtpServer Setup");
+                       Strings.Assign ("Local FtpServer Setup", stringval);
                    END (*IF*);
+                   Strings.Append ("      ", stringval);
+                   Strings.Append (filename, stringval);
+                   OS2.WinSetWindowText (hwnd, stringval);
                    bookwin := OS2.WinWindowFromID (hwnd, DID.notebook);
                    InitialiseNotebook (bookwin);
                    OS2.WinSetWindowPtr (bookwin, OS2.QWL_USER,

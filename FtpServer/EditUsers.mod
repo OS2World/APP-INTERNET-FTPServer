@@ -209,7 +209,7 @@ PROCEDURE StartUserEditor(): BOOLEAN;
     (* Initialisation of the Edit Users page. *)
 
     BEGIN
-        RETURN CreateTask (UserEditor, 2, "User editor");
+        RETURN CreateTask (UserEditor, 3, "User editor");
     END StartUserEditor;
 
 (************************************************************************)

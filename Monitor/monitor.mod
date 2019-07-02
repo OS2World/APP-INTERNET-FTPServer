@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Monitor for FtpServer                                                 *)
-(*  Copyright (C) 2017   Peter Moylan                                     *)
+(*  Copyright (C) 2018   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -27,7 +27,7 @@ MODULE Monitor;
         (*             FtpServer Monitor - PM version               *)
         (*                                                          *)
         (*    Started:        26 March 2000                         *)
-        (*    Last edited:    15 September 2017                     *)
+        (*    Last edited:    10 December 2017                      *)
         (*    Status:         OK                                    *)
         (*                                                          *)
         (************************************************************)
@@ -61,14 +61,14 @@ PROCEDURE GetParameters;
 
     TYPE CharNumber = [0..255];
 
-    VAR args: IOChan.ChanId;  pos: CARDINAL;  TNImode: BOOLEAN;
+    VAR args: IOChan.ChanId;  pos: CARDINAL;  TNImode, explicit: BOOLEAN;
         INIFileName: ARRAY CharNumber OF CHAR;
         tail: ARRAY [0..4] OF CHAR;
 
     BEGIN
-        IF NOT INIData.ChooseDefaultINI("Monitor", TNImode) THEN
-            TNImode := FALSE;
-        END (*IF*);
+        TNImode := FALSE;
+        explicit := FALSE;
+        INIFileName := "";
         args := ArgChan();
         IF IsArgPresent() THEN
             TextIO.ReadString (args, INIFileName);
@@ -79,18 +79,16 @@ PROCEDURE GetParameters;
                 Strings.Delete (INIFileName, 0, 1);
                 IF CAP(INIFileName[0]) = 'T' THEN
                     TNImode := TRUE;
+                    explicit := TRUE;
+                ELSIF CAP(INIFileName[0]) = 'I' THEN
+                    TNImode := TRUE;
+                    explicit := TRUE;
                 END (*IF*);
             END (*IF*);
             WHILE INIFileName[0] = ' ' DO
                 Strings.Delete (INIFileName, 0, 1);
             END (*WHILE*);
-            IF INIFileName[0] = CHR(0) THEN
-                IF TNImode THEN
-                    INIFileName := "MONITOR.TNI";
-                ELSE
-                    INIFileName := "MONITOR.INI";
-                END (*IF*);
-            ELSE
+            IF INIFileName[0] <> CHR(0) THEN
                 pos := LENGTH(INIFileName);
                 IF pos >= 4 THEN
                     DEC (pos, 4);
@@ -99,11 +97,23 @@ PROCEDURE GetParameters;
                     Strings.Capitalize (tail);
                     IF Strings.Equal (tail, ".TNI") THEN
                         TNImode := TRUE;
+                    ELSIF Strings.Equal (tail, ".INI") THEN
+                        TNImode := FALSE;
                     END (*IF*);
                 END (*IF*);
             END (*IF*);
-        ELSE
-            INIFileName := "MONITOR.INI";
+        END (*IF*);
+        IF INIFileName[0] = CHR(0) THEN
+            IF explicit THEN
+                INIData.CommitTNIDecision ("Monitor", TNImode);
+            ELSIF NOT INIData.ChooseDefaultINI ("Monitor", TNImode) THEN
+                TNImode := FALSE;
+            END (*IF*);
+            IF TNImode THEN
+                INIFileName := "MONITOR.TNI";
+            ELSE
+                INIFileName := "MONITOR.INI";
+            END (*IF*);
         END (*IF*);
         SetINIFileName (INIFileName, TNImode);
     END GetParameters;

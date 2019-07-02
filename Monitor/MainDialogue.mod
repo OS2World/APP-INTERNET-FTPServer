@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Monitor for FtpServer                                                 *)
-(*  Copyright (C) 2017   Peter Moylan                                     *)
+(*  Copyright (C) 2018   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -27,7 +27,7 @@ IMPLEMENTATION MODULE MainDialogue;
         (*                        Main dialogue                         *)
         (*                                                              *)
         (*    Started:        29 March 2000                             *)
-        (*    Last edited:    8 October 2017                            *)
+        (*    Last edited:    19 December 2018                          *)
         (*    Status:         OK                                        *)
         (*                                                              *)
         (****************************************************************)
@@ -39,7 +39,7 @@ FROM SYSTEM IMPORT
 
 IMPORT OS2, DID, Init, INIData, Misc, Strings, KillServer, About;
 
-FROM LONGLONG IMPORT
+FROM Arith64 IMPORT
     (* const*)  Zero64,
     (* type *)  CARD64,
     (* proc *)  Compare64, Add64, Diff64, LongDiv64, ShortDiv;
@@ -48,6 +48,12 @@ FROM FtpCl2 IMPORT
     (* proc *)  GetHostAddresses, HostAddress, ConnectToServer, Login,
                 SendCommand, GetResponse, SetMessageWindow,
                 SetupDialogue, SamplingInterval, LoadINIData;
+
+FROM MiscFuncs IMPORT
+    (* proc *)  ConvertDecimal, ConvertCard;
+
+FROM Inet2Misc IMPORT
+    (* proc *)  StringToIPAddress, IPToString;
 
 FROM MonINI IMPORT
     (* proc *)  GetINIFileName;
@@ -250,12 +256,15 @@ PROCEDURE MakeUserRecord (VAR (*IN*) text: ARRAY OF CHAR): UserDataPtr;
         (* Decode the numeric session ID. *)
 
         j := 0;  SkipSpaces;
-        p^.ID := Misc.StringToCard (p^.strval, j);
+        p^.ID := ConvertDecimal (p^.strval, j);
         SkipSpaces;
 
         (* Decode the numeric IP address. *)
 
-        p^.IPaddress := Misc.StringToIPAddress (p^.strval, j);
+        p^.IPaddress := StringToIPAddress (p^.strval, j);
+        WHILE (p^.strval[j] <> Nul) AND (p^.strval[j] <> " ") DO
+            INC (j);
+        END (*WHILE*);
         SkipSpaces;
 
         IF j > 0 THEN
@@ -305,7 +314,7 @@ PROCEDURE MakeUserRecord (VAR (*IN*) text: ARRAY OF CHAR): UserDataPtr;
         (* Put IP address back onto text line. *)
 
         Strings.Append (" (", p^.strval);
-        Misc.IPToString (p^.IPaddress, FALSE, buffer);
+        IPToString (p^.IPaddress, FALSE, buffer);
         Strings.Append (buffer, p^.strval);
         Strings.Append (")", p^.strval);
 
@@ -434,7 +443,7 @@ PROCEDURE TalkToServer (dialoguewindow: ADDRESS);
                     REPEAT
                         address := HostAddress(j);
                         Strings.Assign ("Trying ", text1);
-                        Misc.IPToString (address, TRUE, ServerIP);
+                        IPToString (address, TRUE, ServerIP);
                         Strings.Append (ServerIP, text1);
                         OS2.WinSetWindowText (status, text1);
                         Connected := ConnectToServer (address);
@@ -482,7 +491,7 @@ PROCEDURE TalkToServer (dialoguewindow: ADDRESS);
                 ELSIF KillFlag THEN
                     Strings.Assign ("SITE MNGR KILL ", text1);
                     j := Strings.Length (text1);
-                    Misc.ConvertCard (IDtoKill, text1, j);
+                    ConvertCard (IDtoKill, text1, j);
                     text1[j] := Nul;
                     IF SendCommand (text1) THEN
                         REPEAT

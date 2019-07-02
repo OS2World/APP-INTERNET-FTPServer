@@ -5,13 +5,13 @@ DEFINITION MODULE FV;
         (*                 FtpServer version number                     *)
         (*                                                              *)
         (*    Started:        8 November 2008                           *)
-        (*    Last edited:    17 October 2017                           *)
+        (*    Last edited:    14 March 2019                             *)
         (*    Status:         OK                                        *)
         (*                                                              *)
         (****************************************************************)
 
 
 CONST
-    version = "2.73";
+    version = "2.75";
 END FV.
 

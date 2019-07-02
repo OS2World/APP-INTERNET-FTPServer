@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Setup for FtpServer                                                   *)
-(*  Copyright (C) 2017   Peter Moylan                                     *)
+(*  Copyright (C) 2018   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE EditUser;
         (*          Dialogue to edit the data for one user          *)
         (*                                                          *)
         (*    Started:        25 October 1999                       *)
-        (*    Last edited:    6 October 2017                        *)
+        (*    Last edited:    9 December 2018                       *)
         (*    Status:         OK                                    *)
         (*                                                          *)
         (************************************************************)
@@ -36,7 +36,7 @@ IMPLEMENTATION MODULE EditUser;
 
 IMPORT SYSTEM, OS2, Remote, DID, Strings, Tree, UIPControls, IPFilters, HideList;
 
-FROM LONGLONG IMPORT
+FROM Arith64 IMPORT
     (* const*)  Zero64, Max64,
     (* type *)  CARD64,
     (* proc *)  Compare64;

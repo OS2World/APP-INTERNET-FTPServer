@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  FtpServer FTP daemon                                                  *)
-(*  Copyright (C) 2017   Peter Moylan                                     *)
+(*  Copyright (C) 2019   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ MODULE Ftpd;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            19 August 1997                  *)
-        (*  Last edited:        18 September 2017               *)
+        (*  Last edited:        16 March 2018                   *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (********************************************************)
@@ -118,6 +118,7 @@ FROM CtrlC IMPORT
 (********************************************************************************)
 
 CONST
+    Nul = CHR(0);
     DefaultPort = 21;
     DefaultMaxUsers = 10;
     DefaultTimeout = 900;               (* seconds   *)
@@ -260,6 +261,7 @@ PROCEDURE GetParameters;
 
     VAR level, pos, TNIoption: CARDINAL;  TNImode: BOOLEAN;
         tail: ARRAY [0..3] OF CHAR;
+        param: FilenameString;
 
     BEGIN
         AlreadySet := ParameterSet{};
@@ -282,15 +284,20 @@ PROCEDURE GetParameters;
                                         INCL (AlreadySet, 'F');
                   | 'G':      INC (j);  SetGuestLimit (GetNumber());
                                         INCL (AlreadySet, 'G');
-                  | 'I':      INC (j);  GetString (INIFileName);
-                                        pos := LENGTH(INIFileName)-4;
-                                        Strings.Extract (INIFileName,
-                                                         pos, 4, tail);
-                                        Strings.Capitalize (tail);
-                                        IF Strings.Equal (tail, ".TNI") THEN
-                                            TNIoption := 1;
-                                        ELSE
+                  | 'I':      INC (j);  GetString (param);
+                                        IF param[0] = Nul THEN
                                             TNIoption := 0;
+                                        ELSE
+                                            INIFileName := param;
+                                            pos := LENGTH(INIFileName)-4;
+                                            Strings.Extract (INIFileName,
+                                                             pos, 4, tail);
+                                            Strings.Capitalize (tail);
+                                            IF Strings.Equal (tail, ".TNI") THEN
+                                                TNIoption := 1;
+                                            ELSE
+                                                TNIoption := 0;
+                                            END (*IF*);
                                         END (*IF*);
                   | 'L':      INC (j);  level := GetNumber() MOD 4;
                                         CmdLevel := 16*(CmdLevel DIV 16)

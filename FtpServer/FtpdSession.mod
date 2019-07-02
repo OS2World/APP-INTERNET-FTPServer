@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  FtpServer FTP daemon                                                  *)
-(*  Copyright (C) 2017   Peter Moylan                                     *)
+(*  Copyright (C) 2018   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE FtpdSession;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            21 August 1997                  *)
-        (*  Last edited:        22 November 2017                *)
+        (*  Last edited:        16 December 2018                *)
         (*  Status:             OK                              *)
         (*                                                      *)
         (********************************************************)
@@ -224,12 +224,14 @@ PROCEDURE SetTimeout (seconds: CARDINAL);
     (* Specifies how long a session can be idle before it is forcibly   *)
     (* closed.                                                          *)
 
-    CONST limit = (MAX(CARD32)-1) DIV 1000;
+    CONST
+        limit_in_ms = MAX(CARD32) DIV 2;
+        limit = limit_in_ms DIV 1000;
 
     BEGIN
         Obtain (MaxTimeLock);
         IF seconds > limit THEN
-            MaxTime := MAX(CARD32)-1;
+            MaxTime := limit_in_ms;
         ELSE
             MaxTime := 1000*seconds;
         END (*IF*);
@@ -287,7 +289,7 @@ PROCEDURE TimeoutChecker;
     (* A new instance of this task is created for each client session.  *)
     (* It kills the corresponding SessionHandler task if more than      *)
     (* MaxTime milliseconds have passed since the last Signal() on the  *)
-    (* sessions KeepAlive semaphore.                                    *)
+    (* session's KeepAlive semaphore.                                   *)
 
     (* This is a workaround.  I would have preferred to set the         *)
     (* timeout in the socket options, but I haven't yet figured out     *)

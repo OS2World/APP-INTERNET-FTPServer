@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Setup for FtpServer                                                   *)
-(*  Copyright (C) 2017   Peter Moylan                                     *)
+(*  Copyright (C) 2019   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE UserPage;
         (*                 User page of the notebook                    *)
         (*                                                              *)
         (*        Started:        11 October 1999                       *)
-        (*        Last edited:    14 October 2017                       *)
+        (*        Last edited:    31 March 2019                         *)
         (*        Status:         OK                                    *)
         (*                                                              *)
         (****************************************************************)
@@ -356,23 +356,28 @@ PROCEDURE StoreData (hwnd: OS2.HWND);
         (* Skip any entries for which name = "?".                       *)
 
         k := 0;
-        NEW (list);  list^.seqnum := Skip;  tail := list;
+        list := NIL;  tail := NIL;
         FOR j := 0 TO N-1 DO
             EVAL (OS2.WinSendMsg (lbox, OS2.LM_QUERYITEMTEXT,
                             OS2.MPFROM2SHORT(j, NameLength), ADR(name)));
             IF name[0] <> '?' THEN
-                tail^.name := name;
-                tail^.seqnum := k;
+                NEW (p);
+                p^.next := NIL;
+                p^.name := name;
+                p^.seqnum := k;
                 INC (k);
-                NEW (tail^.next);
-                tail := tail^.next;
+                IF list = NIL THEN
+                    list := p;
+                ELSE
+                    tail^.next := p;
+                END (*IF*);
+                tail := p;
             END (*IF*);
         END (*FOR*);
-        tail^.next := NIL;
 
         (* Now store sequence numbers from the linked list to the INI   *)
-        (* file(s).  A sequence number of MAX(CARD16) means that we     *)
-        (* have already dealt with this entry.                          *)
+        (* file(s).  A sequence number of Skip (=MAX(CARD16)) means     *)
+        (* that we have already dealt with this entry.                  *)
 
         WHILE list <> NIL DO
             IF list^.seqnum <> Skip THEN
@@ -380,6 +385,7 @@ PROCEDURE StoreData (hwnd: OS2.HWND);
                 IF name[0] <> '?' THEN
                     OpenINIForUser (name);
                     INIPut (name, "seqnum", list^.seqnum);
+                    list^.seqnum := Skip;
 
                     (* Deal with any other users in this INI file. *)
 

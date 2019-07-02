@@ -48,13 +48,15 @@ mkdir tools
 'copy ..\tools\AddUser.cmd tools'
 'copy ..\tools\CloseServer.cmd tools'
 'copy ..\tools\FindPassword.cmd tools'
+'copy ..\tools\ftpdctl.cmd tools'
 'copy ..\tools\GetClientAddrs.zip tools'
+'copy ..\tools\LastLogin.cmd tools'
 'copy ..\tools\LimitedUse.cmd tools'
 'copy ..\tools\MakeLetter.cmd tools'
 'copy ..\tools\mdumpini.cmd tools'
 'copy ..\tools\mloadini.cmd tools'
 'copy ..\tools\Migrate.cmd tools'
-'copy ..\tools\movelog.cmd tools'
+'copy ..\tools\MoveLog.cmd tools'
 'copy ..\tools\NewfwIP.cmd tools'
 'copy ..\tools\OneTime.cmd tools'
 'copy ..\tools\remove.cmd tools'
@@ -119,7 +121,7 @@ cd ..
 
 'del src3.zip /N 2>nul'
 'Imports \Dev1\Monitor\Monitor | zip -q -j src3.zip -@'
-'zip -q -j src3.zip \Dev1\Monitor\monitor.prj \Dev1\Monitor\RES\Monitor.res'
+'zip -q -j src3.zip D:\Dev1\Monitor\monitor.prj D:\Dev1\Monitor\RES\Monitor.res'
 
 /* Move all source files into the temp directory, unzip and re-zip.  */
 

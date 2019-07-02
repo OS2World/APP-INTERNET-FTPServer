@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Monitor for FtpServer                                                 *)
-(*  Copyright (C) 2017   Peter Moylan                                     *)
+(*  Copyright (C) 2018   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE Misc;
         (*                 Miscellaneous procedures             *)
         (*                                                      *)
         (*    Started:        29 March 2000                     *)
-        (*    Last edited:    8 October 2017                    *)
+        (*    Last edited:    9 December 2018                   *)
         (*    Status:         adding some 64-bit functions      *)
         (*                                                      *)
         (********************************************************)
@@ -42,7 +42,7 @@ FROM SYSTEM IMPORT
     (* type *)  LOC, CARD8, CARD16, CARD32,
     (* proc *)  CAST;
 
-FROM LONGLONG IMPORT
+FROM Arith64 IMPORT
     (* const*)  Zero64, Max64,
     (* type *)  CARD64,
     (* proc *)  Div10, Compare64, Add64, Sub64, ShortMul64;

@@ -21,14 +21,14 @@ DEFINITION MODULE ["SysCall"] OS2A;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            04 April 2002                   *)
-        (*  Last edited:        13 October 2017                 *)
+        (*  Last edited:        26 January 2018                 *)
         (*  Status:             OK                              *)
         (*                                                      *)
         (********************************************************)
 
 
 IMPORT SYSTEM;
-FROM LONGLONG IMPORT CARD64API;
+FROM Arith64 IMPORT CARD64API;
 FROM OS2 IMPORT HWND, BOOL, HRGN;
 
 (************************************************************************)

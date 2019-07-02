@@ -7,13 +7,13 @@ DEFINITION MODULE FDUsers;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            30 August 1997                  *)
-        (*  Last edited:        8 October 2017                  *)
+        (*  Last edited:        26 January 2018                 *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (********************************************************)
 
 
-FROM LONGLONG IMPORT CARD64;
+FROM Arith64 IMPORT CARD64;
 FROM Semaphores IMPORT Semaphore;
 FROM FileOps IMPORT ChanId;
 FROM Sockets IMPORT Socket;

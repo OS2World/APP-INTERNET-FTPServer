@@ -38,7 +38,7 @@ IMPORT SysClock, Strings;
 
 FROM SYSTEM IMPORT LOC, CARD8;
 
-FROM LONGLONG IMPORT
+FROM Arith64 IMPORT
     (* type *)  CARD64;
 
 FROM FtpTransfers IMPORT

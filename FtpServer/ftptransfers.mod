@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  FtpServer FTP daemon                                                  *)
-(*  Copyright (C) 2017   Peter Moylan                                     *)
+(*  Copyright (C) 2018   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,17 +28,17 @@ IMPLEMENTATION MODULE FtpTransfers;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            24 August 1997                  *)
-        (*  Last edited:        26 November 2017                *)
+        (*  Last edited:        13 December 2018                *)
         (*  Status:             OK                              *)
         (*                                                      *)
         (********************************************************)
 
 FROM SYSTEM IMPORT CARD8, CARD16, LOC, ADDRESS, CAST;
 
-FROM LONGLONG IMPORT
+FROM Arith64 IMPORT
     (* const*)  Zero64, Max64,
-    (* type *)  CARD64,
-    (* proc *)  Add64, Sum64, Compare64, FLOAT64;
+    (* type *)  CARD64, CARD64API,
+    (* proc *)  Add64, Sum64, Compare64, FLOAT64, FromAPI64, ToAPI64;
 
 IMPORT Volume, FileSys, Strings, SysClock;
 
@@ -1140,7 +1140,7 @@ PROCEDURE SendAMessage (S: Socket;  cid: ChanId;  prefix: ARRAY OF CHAR;
                           | 'a': IPToString (ClientIP, TRUE, tmpbuffer);
                                  AppendString (tmpbuffer, buffer, pos);
                                  INC (PosInLine, LENGTH(tmpbuffer));
-                          | 'A': AddressToHostName (ClientIP, tmpbuffer);
+                          | 'A': EVAL(AddressToHostName (ClientIP, tmpbuffer));
                                  AppendString (tmpbuffer, buffer, pos);
                                  INC (PosInLine, LENGTH(tmpbuffer));
                           | 'i': continue := ReadDelimitedString(filename);
@@ -1689,9 +1689,9 @@ PROCEDURE SendAscii (CommandSocket, S: Socket;  LogID: TransactionLogID;
                         errorcode := 0;
                     END (*IF*);
                     IF errorcode = SOCENOBUFS THEN
-    
+
                         (* Allow a second try for non-fatal error. *)
-    
+
                         Sleep (100);
                         N := send (S, source[j], k-j, 0);
                         IF N = MAX(CARDINAL) THEN
@@ -1699,7 +1699,7 @@ PROCEDURE SendAscii (CommandSocket, S: Socket;  LogID: TransactionLogID;
                         ELSE
                             errorcode := 0;
                         END (*IF*);
-    
+
                     END (*IF*);
                     IF errorcode > 0 THEN
                         Strings.Assign ("send()", message);
@@ -1976,6 +1976,7 @@ PROCEDURE SendFile (SS: ClientFileInfo): BOOLEAN;
     (* the client.  Returns TRUE for a successful send.                         *)
 
     VAR cid: ChanId;  count: CARD64;  starttime: REAL;
+        restartpos: CARD64API;
         success: BOOLEAN;
 
     BEGIN
@@ -1997,7 +1998,8 @@ PROCEDURE SendFile (SS: ClientFileInfo): BOOLEAN;
                     total := count;
                     Release (access);
                 END (*WITH*);
-                SetPosition (cid, Sum64(StartPosition(cid), SS^.RestartPoint));
+                restartpos := ToAPI64 (Sum64(FromAPI64(StartPosition(cid)), SS^.RestartPoint));
+                SetPosition (cid, restartpos);
                 SS^.RestartPoint := Zero64;
                 SS^.RestartPointSet := FALSE;
                 starttime := FLOAT(millisecs());
@@ -2087,7 +2089,7 @@ PROCEDURE AcceptFile (SS: ClientFileInfo;  VAR (*OUT*) SizeTooBig: BOOLEAN): BOO
                     SetFileSize (cid, SS^.AmountToAllocate);
                 END (*IF*);
                 SS^.AmountToAllocate := Zero64;
-                SetPosition (cid, Sum64(StartPosition(cid), SS^.RestartPoint));
+                SetPosition (cid, ToAPI64 (Sum64(FromAPI64(StartPosition(cid)), SS^.RestartPoint)));
                 SS^.RestartPoint := Zero64;
                 starttime := FLOAT(millisecs());
                 success := GetFile (SS, SS^.CommandSocket, SS^.ClientPort.socket, cid,

@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Setup for FtpServer                                                   *)
-(*  Copyright (C) 2017   Peter Moylan                                     *)
+(*  Copyright (C) 2018   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE BasicPage;
         (*                    Page 1 of the notebook                    *)
         (*                                                              *)
         (*        Started:        8 October 1999                        *)
-        (*        Last edited:    17 October 2017                       *)
+        (*        Last edited:    16 December 2018                      *)
         (*        Status:         OK                                    *)
         (*                                                              *)
         (****************************************************************)
@@ -527,7 +527,7 @@ PROCEDURE StoreData (hwnd: OS2.HWND);
 
     (* Stores the values on page 1 back into the INI file. *)
 
-    CONST MaxTimeout = (MAX(CARD32)-1) DIV 1000;
+    CONST MaxTimeout = (MAX(CARD32) DIV 2) DIV 1000;
 
     VAR value: CARDINAL;  TelnetDisable: BOOLEAN;
 

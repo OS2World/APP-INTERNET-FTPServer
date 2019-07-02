@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Setup for FtpServer                                                   *)
-(*  Copyright (C) 2017   Peter Moylan                                     *)
+(*  Copyright (C) 2019   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -27,7 +27,7 @@ MODULE Setup;
         (*                   PM Setup for FtpServer                 *)
         (*                                                          *)
         (*    Started:        7 October 1999                        *)
-        (*    Last edited:    18 September 2017                     *)
+        (*    Last edited:    1 April 2019                          *)
         (*    Status:         OK                                    *)
         (*                                                          *)
         (************************************************************)
@@ -39,7 +39,7 @@ FROM PMInit IMPORT
     (* proc *)  OurHab;
 
 FROM RINIData IMPORT
-    (* proc *)  ChooseDefaultINI;
+    (* proc *)  ChooseDefaultINI, CommitTNIDecision;
 
 FROM ProgramArgs IMPORT
     (* proc *)  ArgChan, IsArgPresent;
@@ -52,7 +52,8 @@ VAR hab: OS2.HAB;            (* anchor block handle *)
 (********************************************************************************)
 
 PROCEDURE GetParameters (VAR (*OUT*) LocalRemote: CARDINAL;
-                         VAR (*OUT*) UseTNI: BOOLEAN);
+                            VAR (*INOUT*) UseTNI: BOOLEAN;
+                                    VAR (*OUT*) explicit: BOOLEAN);
 
     (* Picks up program arguments from the command line.                *)
     (* The meaning of LocalRemote is:                                   *)
@@ -60,6 +61,8 @@ PROCEDURE GetParameters (VAR (*OUT*) LocalRemote: CARDINAL;
     (*         1   force local setup                   (option -L)      *)
     (*         2   force remote setup                  (option -R)      *)
     (*         3   force whichever was used last time  (option -G)      *)
+    (* explicit is true iff the UseTNI value has been set by a -T or    *)
+    (* -I specifier.                                                    *)
 
     TYPE CharNumber = [0..79];
 
@@ -86,6 +89,7 @@ PROCEDURE GetParameters (VAR (*OUT*) LocalRemote: CARDINAL;
     (****************************************************************************)
 
     BEGIN
+        explicit := FALSE;
         LocalRemote := 0;
         args := ArgChan();
         IF IsArgPresent() THEN
@@ -100,7 +104,10 @@ PROCEDURE GetParameters (VAR (*OUT*) LocalRemote: CARDINAL;
                                   LocalRemote := 3;
                               END (*IF*);
                   | 'R':      LocalRemote := 2;
+                  | 'I':      UseTNI := FALSE;
+                              explicit := TRUE;
                   | 'T':      UseTNI := TRUE;
+                              explicit := TRUE;
                 ELSE
                     (* unknown option, ignore it *)
                 END (*CASE*);
@@ -114,29 +121,27 @@ PROCEDURE GetParameters (VAR (*OUT*) LocalRemote: CARDINAL;
 (********************************************************************************)
 
 VAR LocalRemote: CARDINAL;
-    UseTNI: BOOLEAN;
+    UseTNI, explicit: BOOLEAN;
     ININame: ARRAY [0..8] OF CHAR;
 
 BEGIN
     hab := OurHab();
+    ININame := "FTPD.INI";
 
     (* NOTE:  clean up from here is handled by the DosExitList processing *)
     (* Since signal exceptions are not handled by RTS yet, using module   *)
     (* finalization for clean up is incorrect. This will be changed in the*)
     (* next release.                                                      *)
 
-    IF NOT ChooseDefaultINI ("ftpd", UseTNI) THEN
+    UseTNI := FALSE;
+    GetParameters (LocalRemote, UseTNI, explicit);
+    IF explicit THEN
+        CommitTNIDecision ("SETUP", UseTNI);
+        CommitTNIDecision ("FTPD", UseTNI);
+    ELSIF NOT ChooseDefaultINI ("FTPD", UseTNI) THEN
         UseTNI := FALSE;
     END (*IF*);
 
-    (* The value of UseTNI set above can be overriden by user parameters. *)
-
-    GetParameters (LocalRemote, UseTNI);
-    IF UseTNI THEN
-        ININame := "FTPD.TNI";
-    ELSE
-        ININame := "FTPD.INI";
-    END (*IF*);
     FSUINI.SetINIFileName (ININame, UseTNI);
     CommonSettings.SetDefaultFont (UseTNI);
     OpeningDialogue.CreateMainDialogue (LocalRemote, UseTNI);

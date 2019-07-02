@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Text-mode setup for FtpServer                                         *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2019   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ MODULE VIOSetup;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            22 January 1998                 *)
-        (*  Last edited:        22 January 2014                 *)
+        (*  Last edited:        16 March 2019                   *)
         (*  Status:             OK                              *)
         (*                                                      *)
         (********************************************************)
@@ -48,7 +48,7 @@ FROM ProgramArgs IMPORT
 
 FROM INIData IMPORT
     (* type *)  HINI,
-    (* proc *)  INIValid, INIGet, INIPut;
+    (* proc *)  ChooseDefaultINI, INIValid, INIGet, INIPut;
 
 FROM Menus IMPORT
     (* type *)  Menu, ItemText,
@@ -311,12 +311,13 @@ PROCEDURE GetCommandLine (w: Window): BOOLEAN;
     (****************************************************************************)
 
     VAR args: ChanId;
-        row, col: CARDINAL;
+        row, col, TNIoption: CARDINAL;
         FirstError: BOOLEAN;
 
     BEGIN
         UseTNI := FALSE;
         FirstError := TRUE;
+        TNIoption := 2;             (* meaning not yet decided *)
         args := ArgChan();
         IF IsArgPresent() THEN
             TextIO.ReadString (args, Options);
@@ -324,7 +325,9 @@ PROCEDURE GetCommandLine (w: Window): BOOLEAN;
             LOOP
                 CASE CAP(Options[j]) OF
                     CHR(0):   EXIT (*LOOP*);
-                  | 'T':      UseTNI := TRUE;
+                  | '-':      (* ignore *)
+                  | 'I':      TNIoption := 0;
+                  | 'T':      TNIoption := 1;
                 ELSE
                     IF FirstError THEN
                         WriteLn (w);
@@ -333,12 +336,20 @@ PROCEDURE GetCommandLine (w: Window): BOOLEAN;
                     WriteLn (w);
                     WriteString (w, "           Unknown option ");
                     WriteChar (w, Options[j]);
-                    INC(j);
                     SaveCursor (w, row, col);
                     Blink (w, row, 10, 18);
                 END (*CASE*);
+                INC(j);
                 SkipBlanks;
             END (*LOOP*);
+        END (*IF*);
+
+        IF TNIoption = 2 THEN
+            IF NOT ChooseDefaultINI ("FTPD", UseTNI) THEN
+                UseTNI := FALSE;
+            END (*IF*);
+        ELSIF TNIoption = 1 THEN
+            UseTNI := TRUE;
         END (*IF*);
 
         RETURN UseTNI;
@@ -353,6 +364,7 @@ PROCEDURE RunTheProgram;
           UpdateSemName = "\SEM32\FTPSERVER\UPDATED";
 
     VAR w0, w1: Window;
+        TNImode: BOOLEAN;
 
     BEGIN
         OpenWindow (w0, yellow, red, 0, 8, 0, 39, noframe, nodivider);
@@ -366,16 +378,22 @@ PROCEDURE RunTheProgram;
 
         OpenWindow (w1, black, green, 0, 8, 40, 79, noframe, nodivider);
         WriteLn (w1);
-        WriteLn (w1);
+        WriteString (w1, "            MODE = INI");
+        WriteLn (w1);  WriteLn (w1);
         WriteString (w1, "    NOTE: Parameters set on this");  WriteLn (w1);
         WriteString (w1, "     page will take effect the");  WriteLn (w1);
         WriteString (w1, "    next time the server is run");  WriteLn (w1);
         WriteString (w1, "          on this machine");
 
-        OpenOurINIFile(GetCommandLine(w1));
-        EVAL(Setup2.StartPage2Editor);
-        EVAL(Security.StartSecurityEditor);
-        EVAL(EditUsers.StartUserEditor);
+        TNImode := GetCommandLine(w1);
+        SetCursor (w1, 1, 19);
+        IF TNImode THEN WriteChar (w1, 'T');
+        ELSE WriteChar (w1, 'I');
+        END (*IF*);
+        OpenOurINIFile(TNImode);
+        EVAL(Setup2.StartPage2Editor());
+        EVAL(Security.StartSecurityEditor());
+        EVAL(EditUsers.StartUserEditor());
         EditDefaultParameters;
         CloseWindow (w1);
         CloseWindow (w0);

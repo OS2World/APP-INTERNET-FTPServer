@@ -1,3 +1,4 @@
+(*PROBABLY OBSOLETE DEFINITION MODULE Misc;*)
 DEFINITION MODULE Misc;
 
         (********************************************************)
@@ -6,22 +7,25 @@ DEFINITION MODULE Misc;
         (*                 Miscellaneous procedures             *)
         (*                                                      *)
         (*    Started:        29 March 2000                     *)
-        (*    Last edited:    8 October 2017                    *)
+        (*    Last edited:    9 December 2018                   *)
         (*    Status:         OK                                *)
         (*                                                      *)
         (********************************************************)
 
 
+(*
 FROM SYSTEM IMPORT
     (* type *)  LOC, CARD16, CARD32;
-
-FROM LONGLONG IMPORT
+*)
+FROM Arith64 IMPORT
     (* type *)  CARD64;
 
-
+(*
 TYPE
     CharArrayPointer = POINTER TO ARRAY [0..MAX(CARDINAL) DIV 4] OF CHAR;
 
+*)
+(*
 PROCEDURE EVAL (f: ARRAY OF LOC);
 
     (* A do-nothing procedure - we use it for evaluating a function and *)
@@ -64,14 +68,14 @@ PROCEDURE Card64ToString (number: CARD64;  VAR (*OUT*) result: ARRAY OF CHAR;
 
     (* Converts number to decimal, left justified starting at result[pos].      *)
     (* On return pos is updated to the next unused array index.                 *)
-
+*)
 PROCEDURE StringToCard64 (VAR (*IN*) string: ARRAY OF CHAR;
                                           VAR (*INOUT*) pos: CARDINAL): CARD64;
 
     (* Reads a decimal number starting at string[pos], updates pos.     *)
     (* This is the same as StringToCard, below, except that we do the   *)
     (* calculation in 64-bit arithmetic.                                *)
-
+(*
 PROCEDURE StringToCard (VAR (*IN*) string: ARRAY OF CHAR;
                                           VAR (*INOUT*) pos: CARDINAL): CARDINAL;
 
@@ -83,6 +87,7 @@ PROCEDURE StringToIPAddress (VAR (*IN*) name: ARRAY OF CHAR;
     (* Converts a string of the form N.N.N.N or [N.N.N.N], where each N is a    *)
     (* decimal number, starting at name[pos] and updating pos.  We assume that  *)
     (* the caller has already checked for syntactic correctness.                *)
+*)
 
 END Misc.
 
