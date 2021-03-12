@@ -1,3 +1,7 @@
+- USEDLL+
+- GENDLL -
+- IMPLIB -
+
 - GENDEBUG +
 - LINENO +
 - GENHISTORY +
@@ -8,6 +12,7 @@
 -gcthreshold=  16000000
 
 -TRACKTNIUSAGE:-
+-EXCEPTQ:+
 
 -INCL_BSE:+
 -INCL_BASE:+

@@ -1,3 +1,7 @@
+- USEDLL+
+- GENDLL -
+- IMPLIB -
+
 -lineno+
 -gendebug+
 -multithread+
@@ -5,6 +9,7 @@
 +m2extensions
 
 -TRACKTNIUSAGE:-
+-EXCEPTQ:+
 
 -INCL_BASE:+
 -INCL_PM:+

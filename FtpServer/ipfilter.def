@@ -6,7 +6,7 @@ DEFINITION MODULE IPFilter;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            5 September 2008                *)
-        (*  Last edited:        5 September 2008                *)
+        (*  Last edited:        19 Octomber 2019                *)
         (*  Status:             OK                              *)
         (*                                                      *)
         (********************************************************)
@@ -14,6 +14,11 @@ DEFINITION MODULE IPFilter;
 
 FROM INIData IMPORT
     (* type *)  HINI;
+
+
+PROCEDURE AddressIsLocal (IPAddress: CARDINAL): BOOLEAN;
+
+    (* Checks whether IPAddress is in the list of local addresses. *)
 
 PROCEDURE CheckMasterIPFilter (IPAddress: CARDINAL): BOOLEAN;
 
@@ -26,7 +31,8 @@ PROCEDURE CheckUserIPFilter (hini: HINI;  user: ARRAY OF CHAR;
 
 PROCEDURE UpdateMasterHostFilter (hini: HINI);
 
-    (* Constructs the master host filter list from the INI file data.  *)
+    (* Constructs the master host filter and the local address list     *)
+    (* from the INI file data.                                          *)
 
 END IPFilter.
 

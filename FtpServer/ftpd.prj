@@ -1,3 +1,7 @@
+- USEDLL+
+- GENDLL -
+- IMPLIB -
+
 - GENDEBUG +
 - LINENO +
 - GENHISTORY +
@@ -5,6 +9,7 @@
 -link    = "xlink /MAP @%s",mkfname#mkfext;
 
 -TRACKTNIUSAGE:-
+-EXCEPTQ:+
 
 -INCL_BASE:+
 -INCL_PM:+

@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Setup for FtpServer                                                   *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2019   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE UIPControls;
         (*    Dialogue to edit the IP address controls for one user     *)
         (*                                                              *)
         (*        Started:        9 September 2008                      *)
-        (*        Last edited:    26 May 2013                           *)
+        (*        Last edited:    21 October 2019                       *)
         (*        Status:         OK                                    *)
         (*                                                              *)
         (****************************************************************)
@@ -78,7 +78,7 @@ PROCEDURE InitialDisplay (hwnd: OS2.HWND);
 
         current := ListHead;
         WHILE current <> NIL DO
-            AddrRecordToText (current, text);
+            AddrRecordToText (current, text, FALSE);
             OS2.WinSendDlgItemMsg (hwnd, DID.UFilterList, OS2.LM_INSERTITEM,
                          OS2.MPFROMSHORT(OS2.LIT_END), ADR(text));
             current := current^.next;
@@ -137,7 +137,7 @@ PROCEDURE ["SysCall"] DialogueProc(hwnd     : OS2.HWND
 
               | DID.UEditFilterButton:
                    IF EditFilter.Edit(listwindow, CurrentItem) THEN
-                       AddrRecordToText (CurrentItem, text);
+                       AddrRecordToText (CurrentItem, text, FALSE);
                        OS2.WinSendDlgItemMsg (hwnd, DID.UFilterList, OS2.LM_SETITEMTEXT,
                               OS2.MPFROMSHORT(index), ADR(text));
                    END (*IF*);
@@ -163,7 +163,7 @@ PROCEDURE ["SysCall"] DialogueProc(hwnd     : OS2.HWND
                    OS2.WinSendDlgItemMsg (hwnd, DID.UFilterList, OS2.LM_SELECTITEM,
                           OS2.MPFROMSHORT(index), OS2.MPFROMSHORT(ORD(TRUE)));
                    IF EditFilter.Edit(listwindow, CurrentItem) THEN
-                       AddrRecordToText (CurrentItem, text);
+                       AddrRecordToText (CurrentItem, text, FALSE);
                        OS2.WinSendDlgItemMsg (hwnd, DID.UFilterList, OS2.LM_SETITEMTEXT,
                               OS2.MPFROMSHORT(index), ADR(text));
 
@@ -172,7 +172,7 @@ PROCEDURE ["SysCall"] DialogueProc(hwnd     : OS2.HWND
 
                        p := CurrentItem^.next;
                        IF p^.type = 0 THEN
-                           AddrRecordToText (p, text);
+                           AddrRecordToText (p, text, FALSE);
                            OS2.WinSendDlgItemMsg (hwnd, DID.UFilterList, OS2.LM_SETITEMTEXT,
                                   OS2.MPFROMSHORT(index+1), ADR(text));
                        END (*IF*);
@@ -200,11 +200,11 @@ PROCEDURE ["SysCall"] DialogueProc(hwnd     : OS2.HWND
                            p^.previous^.next := CurrentItem;
                        END (*IF*);
                        p^.previous := CurrentItem;
-                       AddrRecordToText (p, text);
+                       AddrRecordToText (p, text, FALSE);
                        OS2.WinSendDlgItemMsg (hwnd, DID.UFilterList, OS2.LM_SETITEMTEXT,
                               OS2.MPFROMSHORT(CurrentIndex), ADR(text));
                        DEC (CurrentIndex);
-                       AddrRecordToText (CurrentItem, text);
+                       AddrRecordToText (CurrentItem, text, FALSE);
                        OS2.WinSendDlgItemMsg (hwnd, DID.UFilterList, OS2.LM_SETITEMTEXT,
                               OS2.MPFROMSHORT(CurrentIndex), ADR(text));
                        OS2.WinSendDlgItemMsg (hwnd, DID.UFilterList, OS2.LM_SELECTITEM,
@@ -234,7 +234,7 @@ PROCEDURE ["SysCall"] DialogueProc(hwnd     : OS2.HWND
                    (* If so, might need to change "all others" to "all".    *)
 
                    IF (CurrentItem^.type = 0) AND (CurrentItem^.previous = NIL) THEN
-                       AddrRecordToText (CurrentItem, text);
+                       AddrRecordToText (CurrentItem, text, FALSE);
                        OS2.WinSendDlgItemMsg (hwnd, DID.UFilterList, OS2.LM_SETITEMTEXT,
                               OS2.MPFROMSHORT(index), ADR(text));
                        OS2.WinSetFocus (OS2.HWND_DESKTOP,

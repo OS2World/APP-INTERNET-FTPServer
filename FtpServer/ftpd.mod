@@ -28,7 +28,7 @@ MODULE Ftpd;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            19 August 1997                  *)
-        (*  Last edited:        16 March 2018                   *)
+        (*  Last edited:        24 October 2019                 *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (********************************************************)
@@ -87,6 +87,10 @@ FROM Inet2Misc IMPORT
 
 FROM Names IMPORT
     (* type *)  HostName, FilenameIndex, FilenameString;
+
+FROM OS2Sem IMPORT
+    (* type *)  SemKind,
+    (* proc *)  WaitOnSemaphore;
 
 FROM SplitScreen IMPORT
     (* proc *)  NotDetached, SetBoundary, ClearScreen, WriteStringAt,
@@ -259,14 +263,14 @@ PROCEDURE GetParameters;
 
     (****************************************************************************)
 
-    VAR level, pos, TNIoption: CARDINAL;  TNImode: BOOLEAN;
+    VAR level, pos, TNIoption: CARDINAL;
         tail: ARRAY [0..3] OF CHAR;
         param: FilenameString;
 
     BEGIN
         AlreadySet := ParameterSet{};
         CmdLevel := 0;
-        TNImode := FALSE;
+        UseTNI := FALSE;
         TNIoption := 2;              (* meaning "no decision yet" *)
         INIFileName := "FTPD.INI";
         args := ArgChan();
@@ -330,11 +334,11 @@ PROCEDURE GetParameters;
         END (*IF*);
 
         IF TNIoption < 2 THEN
-            TNImode := TNIoption <> 0;
-        ELSIF NOT ChooseDefaultINI("Ftpd", TNImode) THEN
-            TNImode := FALSE;
+            UseTNI := TNIoption <> 0;
+        ELSIF NOT ChooseDefaultINI("Ftpd", UseTNI) THEN
+            UseTNI := FALSE;
         END (*IF*);
-        IF TNImode THEN
+        IF UseTNI THEN
             pos := LENGTH(INIFileName)-4;
             Strings.Extract (INIFileName,
                              pos, 4, tail);
@@ -345,7 +349,7 @@ PROCEDURE GetParameters;
             END (*IF*);
         END (*IF*);
 
-        SetINIFileName (INIFileName, TNImode);
+        SetINIFileName (INIFileName);
 
     END GetParameters;
 
@@ -364,7 +368,7 @@ PROCEDURE LoadUpdateableINIData;
         CheckTaggers, BehindFirewall, LimitPASVPorts, TelnetDisable,
                                       LogSITEMNGR, HidePasswords: BOOLEAN;
         MaxUsers, GuestLimit, TimeoutLimit,
-           MinLocalAddr, MaxLocalAddr, FirewallIPAddr, TransLevel: CARDINAL;
+                                    FirewallIPAddr, TransLevel: CARDINAL;
         MinPort, MaxPort: CARD16;
         TransLogName: FilenameString;
         SyslogHost: HostName;
@@ -391,8 +395,6 @@ PROCEDURE LoadUpdateableINIData;
         HidePasswords := FALSE;
         MaxUsers := DefaultMaxUsers;
         TimeoutLimit := DefaultTimeout;
-        MinLocalAddr := 0;
-        MaxLocalAddr := MAX(CARDINAL);
         FirewallIPAddr := 0;
         MinPort := Swap2(49152);  MaxPort := Swap2(65535);
         TransLevel := CmdLevel;
@@ -420,8 +422,6 @@ PROCEDURE LoadUpdateableINIData;
         EVAL(GetItem ("TelnetDisable", TelnetDisable));
         EVAL(GetItem ("CheckTaggers", CheckTaggers));
         EVAL(GetItem ("BehindFirewall", BehindFirewall));
-        EVAL(GetItem ("MinLocalAddr", MinLocalAddr));
-        EVAL(GetItem ("MaxLocalAddr", MaxLocalAddr));
         EVAL(GetItem ("FirewallIPAddr", FirewallIPAddr));
         EVAL(GetItem ("MinPort", MinPort));
         EVAL(GetItem ("MaxPort", MaxPort));
@@ -472,8 +472,7 @@ PROCEDURE LoadUpdateableINIData;
         DisableTelnetCompatibility (TelnetDisable);
         EnableTaggedCheck (CheckTaggers);
         SetPassivePortRange (LimitPASVPorts, MinPort, MaxPort);
-        SetBehindFirewall (BehindFirewall, MinLocalAddr, MaxLocalAddr,
-                                                         FirewallIPAddr);
+        SetBehindFirewall (BehindFirewall, FirewallIPAddr);
     END LoadUpdateableINIData;
 
 (************************************************************************)
@@ -521,7 +520,7 @@ PROCEDURE LoadINIData(): BOOLEAN;
         HashMax := 0;
         FreeSpaceThreshold := DefaultFreeSpaceThreshold;
 
-        GetINIFileName (INIFileName, UseTNI);
+        GetINIFileName (INIFileName);
         IF NOT INIFileExists() THEN
             WriteString ("Missing file ");
             WriteString (INIFileName);
@@ -763,8 +762,6 @@ PROCEDURE INIChangeDetector;
 
     CONST semName = "\SEM32\FTPSERVER\UPDATED";
 
-    VAR count: CARDINAL;
-
     BEGIN
         UpdaterFlag := 0;
         IF OS2.DosOpenEventSem (semName, UpdaterFlag) = OS2.ERROR_SEM_NOT_FOUND THEN
@@ -772,8 +769,7 @@ PROCEDURE INIChangeDetector;
         END (*IF*);
 
         WHILE NOT ShutdownInProgress DO
-            OS2.DosWaitEventSem (UpdaterFlag, OS2.SEM_INDEFINITE_WAIT);
-            OS2.DosResetEventSem (UpdaterFlag, count);
+            WaitOnSemaphore (event, UpdaterFlag);
             IF NOT ShutdownInProgress THEN
                 LoadUpdateableINIData;
             END (*IF*);
@@ -795,8 +791,6 @@ PROCEDURE ShutdownRequestDetector;
 
     CONST semName = "\SEM32\FTPSERVER\SHUTDOWN";
 
-    VAR count: CARDINAL;
-
     BEGIN
         ExternalShutdownRequest := 0;
         IF OS2.DosOpenEventSem (semName, ExternalShutdownRequest) = OS2.ERROR_SEM_NOT_FOUND THEN
@@ -807,12 +801,8 @@ PROCEDURE ShutdownRequestDetector;
         (* treat a CTRL/C.  In particular, we accept it more than once.         *)
 
         WHILE NOT RapidShutdown DO
-            OS2.DosWaitEventSem (ExternalShutdownRequest, OS2.SEM_INDEFINITE_WAIT);
-            OS2.DosResetEventSem (ExternalShutdownRequest, count);
+            WaitOnSemaphore (event, ExternalShutdownRequest);
             Signal (ShutdownRequest);
-            IF count > 0 THEN
-                Signal (ShutdownRequest);
-            END (*IF*);
         END (*WHILE*);
 
         OS2.DosCloseEventSem(ExternalShutdownRequest);

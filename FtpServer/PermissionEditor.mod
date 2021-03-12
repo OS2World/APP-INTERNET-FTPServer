@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Text-mode setup for FtpServer                                         *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2020   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE PermissionEditor;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            2 December 1997                 *)
-        (*  Last edited:        22 October 2001                 *)
+        (*  Last edited:        5 December 2020                 *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (********************************************************)
@@ -1185,10 +1185,8 @@ PROCEDURE CategoriseNode (VAR (*INOUT*) p: DirEntryPtr);
             (* possibilities: this is a file, this is a directory, this *)
             (* is something that doesn't exist on our disk.             *)
 
-            p^.exists := FirstDirEntry (fullname, FALSE, TRUE, D);
-            IF p^.exists THEN
-                p^.IsAFile := NOT(directory IN D.attr);
-            END (*IF*);
+            p^.exists := FirstDirEntry (fullname, TRUE, FALSE, TRUE, D);
+            p^.IsAFile := p^.exists AND NOT(directory IN D.attr);
             DirSearchDone (D);
         END (*IF*);
 
@@ -1265,7 +1263,7 @@ PROCEDURE ExpandNode (VAR (*INOUT*) p: DirEntryPtr);
             IF (p^.ppath[0] <> Nul) AND p^.exists AND NOT p^.IsAFile THEN
                 Strings.Assign (p^.ppath, SearchString);
                 Strings.Append ('/*', SearchString);
-                MoreToGo := FirstDirEntry (SearchString, TRUE, TRUE, D);
+                MoreToGo := FirstDirEntry (SearchString, FALSE, TRUE, TRUE, D);
                 WHILE MoreToGo DO
                     IF (D.name[0] = '.') AND (D.name[1]=Nul)
                                  OR ((D.name[1]='.') AND (D.name[2] = Nul)) THEN

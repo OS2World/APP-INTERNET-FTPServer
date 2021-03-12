@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Text-mode monitor for FtpServer                                       *)
-(*  Copyright (C) 2017   Peter Moylan                                     *)
+(*  Copyright (C) 2019   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE FtpCl2;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            28 October 1997                 *)
-        (*  Last edited:        22 May 2017                     *)
+        (*  Last edited:        2 October 2019                  *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (********************************************************)
@@ -463,7 +463,7 @@ PROCEDURE LoadINIData;
     BEGIN
         ServerApp := "Server";
         FName := "Monitor.INI";
-        hini := OpenINIFile (FName, FALSE);
+        hini := OpenINIFile (FName);
         IF NOT INIValid (hini) THEN
             WriteString (status, "Could not open MONITOR.INI");
             WriteLn (status);

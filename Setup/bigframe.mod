@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE BigFrame;
         (*             The settings notebook and its frame          *)
         (*                                                          *)
         (*    Started:        8 October 1999                        *)
-        (*    Last edited:    16 March 2019                         *)
+        (*    Last edited:    22 October 2019                       *)
         (*    Status:         OK                                    *)
         (*                                                          *)
         (************************************************************)
@@ -36,8 +36,8 @@ IMPLEMENTATION MODULE BigFrame;
 
 IMPORT OS2, OS2RTL;
 
-IMPORT DID, BasicPage, LogPage, OptionPage, Security, UserPage, Strings,
-       CommonSettings, INIData;
+IMPORT DID, BasicPage, LogPage, OptionPage, LocalAddrs, Security, UserPage,
+        Strings, CommonSettings, INIData;
 
 FROM SYSTEM IMPORT
     (* type *)  ADDRESS,
@@ -55,22 +55,25 @@ FROM Remote IMPORT
 FROM INIData IMPORT
     (* proc *)  SetInitialWindowPosition, StoreWindowPosition;
 
+FROM FSUINI IMPORT
+    (* proc *)  TNImode;
+
 (**************************************************************************)
 
 CONST
     NewStyle = TRUE;
     Nul = CHR(0);
-    INIFileName0 = "Setup";
+    SetupINIname0 = "Setup";
 
 TYPE
-    Page = [1..5];
+    Page = (pbase, plog, poption, plocal, psecurity, puser);
 
 VAR
-    INIFileName: ARRAY [0..127] OF CHAR;
+    SetupINIname: ARRAY [0..127] OF CHAR;
     pagehandle: ARRAY Page OF OS2.HWND;
     IDofPage: ARRAY Page OF CARDINAL;
     StartingPage: Page;
-    UseTNI, ChangeInProgress: BOOLEAN;
+    ChangeInProgress, LocalPagePresent: BOOLEAN;
     PageFont, TabFontName: CommonSettings.FontName;
 
 (**************************************************************************)
@@ -89,6 +92,7 @@ PROCEDURE SetPageFonts;
             BasicPage.SetFont (PageFont);
             LogPage.SetFont (PageFont);
             OptionPage.SetFont (PageFont);
+            LocalAddrs.SetFont (PageFont);
             Security.SetFont (PageFont);
             UserPage.SetFont (PageFont);
         END (*IF*);
@@ -139,7 +143,7 @@ PROCEDURE InitialiseNotebook (hwnd: OS2.HWND);
         NewStyle := scale >= 40;
         MakeNotebookNewStyle (hwnd, NewStyle);
 
-        hini := INIData.OpenINIFile (INIFileName, UseTNI);
+        hini := INIData.OpenINIFile (SetupINIname);
         app := "StartingPage";
         IF NOT INIData.INIGet (hini, app, "MainNotebook", StartingPage) THEN
             StartingPage := MIN(Page);
@@ -167,11 +171,15 @@ PROCEDURE InitialiseNotebook (hwnd: OS2.HWND);
         OS2.WinSendMsg (hwnd, OS2.BKM_SETNOTEBOOKCOLORS,
                         CAST(ADDRESS,colour), CAST(ADDRESS,background));
 
-        pagehandle[1] := BasicPage.CreatePage(hwnd, UseTNI, IDofPage[1]);
-        pagehandle[2] := LogPage.CreatePage(hwnd, IDofPage[2]);
-        pagehandle[3] := OptionPage.CreatePage(hwnd, IDofPage[3]);
-        pagehandle[4] := Security.CreatePage(hwnd, IDofPage[4]);
-        pagehandle[5] := UserPage.CreatePage(hwnd, UseTNI, IDofPage[5]);
+        (* Begin with the local page absent, and let the appropriate    *)
+        (* lower-level module request its insertion if needed.          *)
+
+        pagehandle[pbase] := BasicPage.CreatePage(hwnd, IDofPage[pbase]);
+        pagehandle[plog] := LogPage.CreatePage(hwnd, IDofPage[plog]);
+        pagehandle[poption] := OptionPage.CreatePage(hwnd, IDofPage[poption]);
+        LocalPagePresent := FALSE;
+        pagehandle[psecurity] := Security.CreatePage(hwnd, IDofPage[psecurity]);
+        pagehandle[puser] := UserPage.CreatePage(hwnd, IDofPage[puser]);
         SetPageFonts;
         OS2.WinSendMsg (hwnd, OS2.BKM_TURNTOPAGE,
                            OS2.MPFROMULONG(IDofPage[StartingPage]), NIL);
@@ -185,6 +193,46 @@ PROCEDURE InitialiseNotebook (hwnd: OS2.HWND);
         OS2.WinShowWindow (owner, FALSE);
 
     END InitialiseNotebook;
+
+(************************************************************************)
+
+PROCEDURE InsertLocalAddrsPage (hwnd: OS2.HWND;  Insert, new: BOOLEAN);
+
+    (* Adds or removes the LocalAddrs notebook page.  The "new"         *)
+    (* parameter indicates that "behind firewall" rules have just been  *)
+    (* activated, as distinct from an activation at program startup.    *)
+
+    VAR notebook: OS2.HWND;
+
+    BEGIN
+        notebook := OS2.WinWindowFromID(hwnd, DID.notebook);
+        IF LocalPagePresent <> Insert THEN
+
+            IF Insert THEN
+
+                (* Insert the LocalAddrs page. *)
+
+                pagehandle[plocal] := LocalAddrs.CreatePage(notebook,
+                                      IDofPage[poption], IDofPage[plocal]);
+                IF new THEN
+                    OS2.WinPostMsg (notebook, OS2.BKM_TURNTOPAGE,
+                         OS2.MPFROMULONG(IDofPage[plocal]), NIL);
+                END (*IF*);
+
+            ELSE
+
+                (* Close the LocalAddrs page. *)
+
+                LocalAddrs.Close(notebook, pagehandle[plocal], IDofPage[plocal]);
+                IDofPage[plocal] := 0;
+
+            END (*IF*);
+
+            LocalPagePresent := Insert;
+
+        END (*IF*);
+
+    END InsertLocalAddrsPage;
 
 (**************************************************************************)
 (*                WINDOW PROCEDURE FOR SUBCLASSED CASE                    *)
@@ -237,7 +285,7 @@ PROCEDURE ["SysCall"] SubWindowProc (hwnd     : OS2.HWND;
 
                 IF NOT Strings.Equal (NewFontName, TabFontName) THEN
                     TabFontName := NewFontName;
-                    hini := INIData.OpenINIFile (INIFileName, UseTNI);
+                    hini := INIData.OpenINIFile (SetupINIname);
                     app := "Font";
                     INIData.INIPutString (hini, app, "MainNotebookTabs", TabFontName);
                     INIData.CloseINIFile (hini);
@@ -270,8 +318,8 @@ PROCEDURE ["SysCall"] MainDialogueProc(hwnd     : OS2.HWND
     BEGIN
         CASE msg OF
            |  OS2.WM_INITDLG:
-                   SetInitialWindowPosition (hwnd, INIFileName, "BigFrame", UseTNI);
-                   IF UseTNI THEN
+                   SetInitialWindowPosition (hwnd, SetupINIname, "BigFrame");
+                   IF TNImode() THEN
                        filename := "FTPD.TNI";
                    ELSE
                        filename := "FTPD.INI";
@@ -305,6 +353,11 @@ PROCEDURE ["SysCall"] MainDialogueProc(hwnd     : OS2.HWND
                        RETURN NIL;
                    END (*IF*);
 
+           |  CommonSettings.BEHINDFIREWALL:
+                   InsertLocalAddrsPage (hwnd, OS2.LONGFROMMR(mp1) > 0,
+                                                OS2.LONGFROMMR(mp2) > 0);
+                   RETURN OS2.WinDefDlgProc(hwnd, msg, mp1, mp2);
+
            |  OS2.WM_CLOSE:
                    bookwin := OS2.WinWindowFromID(hwnd, DID.notebook);
                    pageID := OS2.ULONGFROMMR(OS2.WinSendMsg (bookwin, OS2.BKM_QUERYPAGEID,
@@ -314,16 +367,17 @@ PROCEDURE ["SysCall"] MainDialogueProc(hwnd     : OS2.HWND
                    WHILE (IDofPage[pg] <> pageID) AND (pg > MIN(Page)) DO
                        DEC (pg);
                    END (*WHILE*);
-                   hini := INIData.OpenINIFile (INIFileName, UseTNI);
+                   hini := INIData.OpenINIFile (SetupINIname);
                    app := "StartingPage";
                    INIData.INIPut (hini, app, "MainNotebook", pg);
                    INIData.CloseINIFile (hini);
-                   StoreWindowPosition (hwnd, INIFileName, "BigFrame", UseTNI);
-                   BasicPage.StoreData (pagehandle[1]);
-                   LogPage.StoreData (pagehandle[2]);
-                   OptionPage.StoreData (pagehandle[3]);
-                   Security.StoreData (pagehandle[4]);
-                   UserPage.StoreData (pagehandle[5]);
+                   StoreWindowPosition (hwnd, SetupINIname, "BigFrame");
+                   BasicPage.StoreData (pagehandle[pbase]);
+                   LogPage.StoreData (pagehandle[plog]);
+                   OptionPage.StoreData (pagehandle[poption]);
+                   LocalAddrs.StoreData (pagehandle[plocal]);
+                   Security.StoreData (pagehandle[psecurity]);
+                   UserPage.StoreData (pagehandle[puser]);
                    RETURN OS2.WinDefDlgProc(hwnd, msg, mp1, mp2);
 
         ELSE    (* default *)
@@ -334,17 +388,16 @@ PROCEDURE ["SysCall"] MainDialogueProc(hwnd     : OS2.HWND
 
 (**************************************************************************)
 
-PROCEDURE OpenBigFrame (owner: OS2.HWND;  TNImode: BOOLEAN);
+PROCEDURE OpenBigFrame (owner: OS2.HWND);
 
     (* Creates the main dialogue box. *)
 
     BEGIN
-        UseTNI := TNImode;
-        INIFileName := INIFileName0;
-        IF UseTNI THEN
-            Strings.Append (".TNI", INIFileName);
+        SetupINIname := SetupINIname0;
+        IF TNImode() THEN
+            Strings.Append (".TNI", SetupINIname);
         ELSE
-            Strings.Append (".INI", INIFileName);
+            Strings.Append (".INI", SetupINIname);
         END (*IF*);
         OS2.WinDlgBox(OS2.HWND_DESKTOP, owner,
                        MainDialogueProc,    (* dialogue procedure *)
@@ -359,7 +412,6 @@ VAR pg: Page;
 
 BEGIN
     ChangeInProgress := FALSE;
-    UseTNI := FALSE;
     PageFont := "";
     StartingPage := MIN(Page);
     FOR pg := MIN(Page) TO MAX(Page) DO

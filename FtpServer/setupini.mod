@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Text-mode setup for FtpServer                                         *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2019   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE SetupINI;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            1 February 1998                 *)
-        (*  Last edited:        30 May 2012                     *)
+        (*  Last edited:        2 October 2019                  *)
         (*  Status:             OK                              *)
         (*                                                      *)
         (********************************************************)
@@ -56,7 +56,7 @@ PROCEDURE OpenOurINIFile (UseTNI: BOOLEAN);
         ELSE
             name := "ftpd.ini";
         END (*IF*);
-        hini := OpenINIFile (name, UseTNI);
+        hini := OpenINIFile (name);
     END OpenOurINIFile;
 
 (********************************************************************************)

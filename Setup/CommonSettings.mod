@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Setup for FtpServer                                                   *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2019   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE CommonSettings;
         (*             Data common to the main Setup notebook           *)
         (*                                                              *)
         (*    Started:        20 October 2003                           *)
-        (*    Last edited:    30 May 2012                               *)
+        (*    Last edited:    2 October 2019                            *)
         (*    Status:         OK                                        *)
         (*                                                              *)
         (****************************************************************)
@@ -81,7 +81,7 @@ PROCEDURE UpdateFontFrom (hwnd: OS2.HWND);
         IF NOT Strings.Equal (NewFontName, OurFontName) THEN
 
             OurFontName := NewFontName;
-            hini := INIData.OpenINIFile (INIFileName, UseTNI);
+            hini := INIData.OpenINIFile (INIFileName);
             app := "Font";
             INIData.INIPutString (hini, app, "MainNotebook", OurFontName);
             INIData.CloseINIFile (hini);
@@ -119,7 +119,7 @@ PROCEDURE SetDefaultFont (TNImode: BOOLEAN);
         ELSE
             Strings.Append (".INI", INIFileName);
         END (*IF*);
-        hini := INIData.OpenINIFile(INIFileName, UseTNI);
+        hini := INIData.OpenINIFile(INIFileName);
         IF INIData.INIValid(hini) THEN
             app := "Font";
             IF NOT INIData.INIGetString (hini, app, "MainNotebook", OurFontName)

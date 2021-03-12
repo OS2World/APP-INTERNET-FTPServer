@@ -1,3 +1,7 @@
+- USEDLL+
+- GENDLL -
+- IMPLIB -
+
 -multithread+
 -INCL_DOS:+
 -INCL_DOSERRORS:+

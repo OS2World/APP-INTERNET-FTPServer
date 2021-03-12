@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Monitor for FtpServer                                                 *)
-(*  Copyright (C) 2018   Peter Moylan                                     *)
+(*  Copyright (C) 2020   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE FtpCl2;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            28 October 1997                 *)
-        (*  Last edited:        9 December 2018                 *)
+        (*  Last edited:        20 November 2020                *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (********************************************************)
@@ -571,7 +571,7 @@ PROCEDURE SetupDialogue (owner: OS2.HWND): BOOLEAN;
     (* Creates the remote setup dialogue box.  Returns the state of     *)
     (* the "always on top" checkbox.                                    *)
 
-    VAR hwnd: OS2.HWND;  UseTNI: BOOLEAN;
+    VAR hwnd: OS2.HWND;
         ININame: ARRAY [0..511] OF CHAR;
 
     BEGIN
@@ -582,12 +582,12 @@ PROCEDURE SetupDialogue (owner: OS2.HWND): BOOLEAN;
                        NIL);                 (* creation parameters *)
 
 
-        GetINIFileName (ININame, UseTNI);
-        SetInitialWindowPosition (hwnd, ININame, "Setup", UseTNI);
+        GetINIFileName (ININame);
+        SetInitialWindowPosition (hwnd, ININame, "Setup");
         OS2.WinShowWindow (hwnd, TRUE);
 
         OS2.WinProcessDlg(hwnd);
-        StoreWindowPosition (hwnd, ININame, "Setup", UseTNI);
+        StoreWindowPosition (hwnd, ININame, "Setup");
         OS2.WinDestroyWindow (hwnd);
         RETURN AlwaysOnTop;
     END SetupDialogue;

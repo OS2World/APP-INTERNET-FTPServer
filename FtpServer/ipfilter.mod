@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  FtpServer FTP daemon                                                  *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2019   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE IPFilter;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            5 September 2008                *)
-        (*  Last edited:        22 May 2012                     *)
+        (*  Last edited:        24 October 2019                 *)
         (*  Status:             OK                              *)
         (*                                                      *)
         (********************************************************)
@@ -45,7 +45,11 @@ FROM Storage IMPORT
 
 FROM INIData IMPORT
     (* type *)  HINI,
-    (* proc *)  INIValid, ItemSize, INIGetTrusted;
+    (* proc *)  INIValid, ItemSize, INIGetTrusted, INIGet,
+                INIDeleteKey, INIPutBinary;
+
+FROM FtpdINI IMPORT
+    (* proc *)  OpenINIFile, CloseINIFile;
 
 FROM Names IMPORT
     (* type *)  UserName;
@@ -72,7 +76,17 @@ TYPE
                                  next: AddressListPointer;
                              END (*RECORD*);
 
-(********************************************************************************)
+    (* The record types are:                *)
+    (*              0       end of list                                 *)
+    (*              1       address and mask                            *)
+    (*              2       single address                              *)
+    (*              3       address and bit count                       *)
+    (*              4       range                                       *)
+    (* When loading a list, types 2 and 3 are treated as special cases  *)
+    (* of type 1, so 2 and 3 do not appear in the loaded list.  For     *)
+    (* type 4, the "mask" field holds the upper address.                *)
+
+(************************************************************************)
 
 VAR
     (* Lists of IP addresses against we check each new client,  *)
@@ -80,6 +94,17 @@ VAR
 
     MasterHostFilter: AddressListPointer;
     MasterHostFilterLock: Lock;
+
+    (* List of local addresses (only relevant if the "behind firewall"  *)
+    (* rules are in use).  We use the same master lock for critical     *)
+    (* section protection.                                              *)
+
+    LocalAddrs: AddressListPointer;
+
+    (* A flag to say that we've already dealt with the case of  *)
+    (* old-format data.                                         *)
+
+    ConversionDone: BOOLEAN;
 
 (************************************************************************)
 (*                    LOADING AND UNLOADING FILTERS                     *)
@@ -104,7 +129,7 @@ PROCEDURE BitsToMask (numbits: CARDINAL): CARDINAL;
 
 (************************************************************************)
 
-PROCEDURE LoadFilter (hini: HINI;  app: ARRAY OF CHAR): AddressListPointer;
+PROCEDURE LoadFilter (hini: HINI;  app, key: ARRAY OF CHAR): AddressListPointer;
 
     (* Loads a filter list from the INI file into memory.  We process   *)
     (* the records such that, after loading, only types 0, 1, and 4     *)
@@ -113,7 +138,6 @@ PROCEDURE LoadFilter (hini: HINI;  app: ARRAY OF CHAR): AddressListPointer;
     VAR j, size: CARDINAL;
         bufptr: POINTER TO ARRAY [0..65535] OF LOC;
         result, current: AddressListPointer;
-        key: ARRAY [0..8] OF CHAR;
 
     (********************************************************************)
 
@@ -135,10 +159,9 @@ PROCEDURE LoadFilter (hini: HINI;  app: ARRAY OF CHAR): AddressListPointer;
     BEGIN
         result := NIL;
         IF INIValid (hini)
-                 AND (ItemSize (hini, app, "IPfilter", size)) THEN
+                 AND (ItemSize (hini, app, key, size)) THEN
             IF size <> 0 THEN
                 ALLOCATE (bufptr, size);
-                key := "IPfilter";
                 EVAL(INIGetTrusted (hini, app, key, bufptr^, size));
                 j := 0;  current := NIL;
                 WHILE j < size DO
@@ -245,6 +268,21 @@ PROCEDURE CheckMasterIPFilter (IPAddress: CARDINAL): BOOLEAN;
 
 (************************************************************************)
 
+PROCEDURE AddressIsLocal (IPAddress: CARDINAL): BOOLEAN;
+
+    (* Checks whether IPAddress is in the list of local addresses. *)
+
+    VAR result: BOOLEAN;
+
+    BEGIN
+        Obtain (MasterHostFilterLock);
+        result := ScanList (LocalAddrs, IPAddress);
+        Release (MasterHostFilterLock);
+        RETURN result;
+    END AddressIsLocal;
+
+(************************************************************************)
+
 PROCEDURE CheckUserIPFilter (hini: HINI;  user: ARRAY OF CHAR;
                                 IPAddress: CARDINAL): BOOLEAN;
 
@@ -254,7 +292,7 @@ PROCEDURE CheckUserIPFilter (hini: HINI;  user: ARRAY OF CHAR;
         result: BOOLEAN;
 
     BEGIN
-        L := LoadFilter (hini, user);
+        L := LoadFilter (hini, user, "IPfilter");
         result := ScanList (L, IPAddress);
         UnloadFilter (L);
         RETURN result;
@@ -264,14 +302,166 @@ PROCEDURE CheckUserIPFilter (hini: HINI;  user: ARRAY OF CHAR;
 (*                           INITIALISATION                             *)
 (************************************************************************)
 
+PROCEDURE StoreFilter (hini: HINI;  app, key: ARRAY OF CHAR;
+                                        p: AddressListPointer);
+
+    (* Stores the p^ list to the INI file. *)
+
+    VAR j: CARDINAL;
+        bufptr: POINTER TO ARRAY [0..65535] OF LOC;
+
+    (********************************************************************)
+
+    PROCEDURE Put (x: ARRAY OF LOC);
+
+        (* Copies the right number of bytes from x to bufptr[j], and    *)
+        (* updates j.                                                   *)
+
+        VAR k: CARDINAL;
+
+        BEGIN
+            FOR k := 0 TO HIGH(x) DO
+                bufptr^[j] := x[k];  INC(j);
+            END (*FOR*);
+        END Put;
+
+    (********************************************************************)
+
+    CONST
+        R0size = SIZE(BOOLEAN) + SIZE(RecordKind);
+        Rsize = R0size + 2*SIZE(CARDINAL);
+
+    VAR size: CARDINAL;
+        p0: AddressListPointer;
+
+    BEGIN
+        INIDeleteKey (hini, app, key);
+        IF p <> NIL THEN
+
+            (* Begin by calculating how much space we need. *)
+
+            p0 := p;  size := R0size;
+            WHILE p^.type <> 0 DO
+                INC (size, Rsize);
+                p := p^.next;
+            END (*WHILE*);
+            ALLOCATE (bufptr, size);
+
+            (* Copy the data into bufptr^. *)
+
+            p := p0;  j := 0;
+            WHILE p^.type <> 0 DO
+                Put (p^.allow);
+                Put (p^.type);
+                Put (p^.IPAddress);
+                Put (p^.mask);
+                p := p^.next;
+            END (*WHILE*);
+
+            (* Next, the end-of-data record. *)
+
+            Put (p^.allow);
+            Put (p^.type);
+
+            (* Store the result in the INI file. *)
+
+            INIPutBinary (hini, app, key, bufptr^, size);
+            DEALLOCATE (bufptr, size);
+
+        END (*IF*);
+
+    END StoreFilter;
+
+(************************************************************************)
+
+PROCEDURE ConvertLocalFromOldFormat;
+
+    (* If the master address list is empty, re-create it.   *)
+
+    VAR next, p: AddressListPointer;
+        MinAddr, MaxAddr: CARDINAL;
+        app: ARRAY [0..4] OF CHAR;
+        hini: HINI;
+
+    BEGIN
+        hini := OpenINIFile();
+        app := '$SYS';
+        IF INIGet (hini, app, 'MinLocalAddr', MinAddr) THEN
+
+            (* Since that entry exists in the INI file, we have         *)
+            (* old-format information.  Delete that, and construct a    *)
+            (* list that contains the same information.                 *)
+
+            IF (LocalAddrs <> NIL) AND (LocalAddrs^.type = 0) THEN
+    
+                (* List starts with end record, so effectively empty. *)
+    
+                WHILE LocalAddrs <> NIL DO
+                    next := LocalAddrs^.next;
+                    DISPOSE (LocalAddrs);
+                    LocalAddrs := next;
+                END (*WHILE*);
+    
+            END (*IF*);
+    
+            (* After that preliminary, we have either a genuine list (which *)
+            (* we don't want to alter), or a totally empty list.            *)
+    
+            IF LocalAddrs = NIL THEN
+
+                IF NOT INIGet (hini, app, 'MaxLocalAddr', MaxAddr) THEN
+                    MaxAddr := MinAddr;
+                END (*IF*);
+
+                (* Create a list that represents the address range. *)
+
+                NEW (LocalAddrs);
+                p := LocalAddrs;
+                p^.next := NIL;
+                p^.allow := TRUE;
+                p^.type := 4;
+                p^.IPAddress := MinAddr;
+                p^.mask := MaxAddr;
+    
+                NEW (p^.next);
+                p := p^.next;
+                p^.next := NIL;
+                p^.allow := FALSE;
+                p^.type := 0;
+                p^.IPAddress := 0;
+                p^.mask := 0;
+
+                (* Put the list into the INI file to replace the old data. *)
+
+                INIDeleteKey (hini, app, 'MinLocalAddr');
+                INIDeleteKey (hini, app, 'MaxLocalAddr');
+                StoreFilter (hini, app, "LocalAddrs", LocalAddrs);
+
+            END (*IF*);
+
+        END (*IF*);
+
+        CloseINIFile(hini);
+        ConversionDone := TRUE;
+
+    END ConvertLocalFromOldFormat;
+
+(************************************************************************)
+
 PROCEDURE UpdateMasterHostFilter (hini: HINI);
 
-    (* Constructs the master host filter list from the INI file data.  *)
+    (* Constructs the master host filter and the local address list     *)
+    (* from the INI file data.                                          *)
 
     BEGIN
         Obtain (MasterHostFilterLock);
         UnloadFilter (MasterHostFilter);
-        MasterHostFilter := LoadFilter (hini, "$SYS");
+        MasterHostFilter := LoadFilter (hini, "$SYS", "IPfilter");
+        UnloadFilter (LocalAddrs);
+        LocalAddrs := LoadFilter (hini, "$SYS", "LocalAddrs");
+        IF NOT ConversionDone THEN
+            ConvertLocalFromOldFormat;
+        END (*IF*);
         Release (MasterHostFilterLock);
     END UpdateMasterHostFilter;
 
@@ -280,5 +470,7 @@ PROCEDURE UpdateMasterHostFilter (hini: HINI);
 BEGIN
     CreateLock (MasterHostFilterLock);
     MasterHostFilter := NIL;
+    LocalAddrs := NIL;
+    ConversionDone := FALSE;
 END IPFilter.
 

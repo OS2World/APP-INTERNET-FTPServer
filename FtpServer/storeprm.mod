@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  StorePRM utility for FtpServer                                        *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2019   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -24,11 +24,11 @@ MODULE StorePRM;
 
         (********************************************************)
         (*                                                      *)
-        (*  Program to store data from ftpd.ini to PRM files    *)
+        (* Program to store data from ftpd.ini/tni to PRM files *)
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            6 March 1998                    *)
-        (*  Last edited:        6 February 2015                 *)
+        (*  Last edited:        25 October 2019                 *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (********************************************************)
@@ -40,7 +40,7 @@ FROM SYSTEM IMPORT
 IMPORT OS2, IOChan, ChanConsts, Strings, STextIO, TextIO, SeqFile, FileSys;
 
 FROM INIData IMPORT
-    (* type *)  HINI, StringReadState,
+    (* type *)  ChooseDefaultINI, HINI, StringReadState,
     (* proc *)  OpenINIFile, INIValid, CloseINIFile, ItemSize,
                 INIGet, INIGetString, INIGetTrusted,
                 GetStringList, NextString, CloseStringList;
@@ -557,7 +557,7 @@ PROCEDURE GetParameter (VAR (*OUT*) result: ARRAY OF CHAR): BOOLEAN;
 
     CONST testing = FALSE;
 
-    VAR args: IOChan.ChanId;  j, k: CARDINAL;  UseTNI: BOOLEAN;
+    VAR args: IOChan.ChanId;  j, k, TNIoption: CARDINAL;  UseTNI: BOOLEAN;
 
     BEGIN
         IF testing THEN
@@ -571,13 +571,20 @@ PROCEDURE GetParameter (VAR (*OUT*) result: ARRAY OF CHAR): BOOLEAN;
             END (*IF*);
         END (*IF*);
 
-        (* Check for -t option. *)
+        TNIoption := 2;              (* meaning "no decision yet" *)
+
+        (* Check for -i or -t option. *)
 
         UseTNI := FALSE;
         k := 0;
         WHILE result[k] = ' ' DO INC (k) END (*WHILE*);
-        IF (result[k] = '-') AND (CAP(result[k+1]) = 'T') THEN
-            UseTNI := TRUE;
+        IF result[k] = '-' THEN
+            INC (k);
+            IF CAP(result[k]) = 'I' THEN
+                TNIoption := 0;
+            ELSIF CAP(result[k]) = 'T' THEN
+                TNIoption := 1;
+            END (*IF*);
             INC (k, 2);
             WHILE result[k] = ' ' DO INC (k) END (*WHILE*);
             Strings.Delete (result, 0, k);
@@ -590,6 +597,12 @@ PROCEDURE GetParameter (VAR (*OUT*) result: ARRAY OF CHAR): BOOLEAN;
             DEC (j);
         END (*WHILE*);
         result[j] := CHR(0);
+
+        IF TNIoption < 2 THEN
+            UseTNI := TNIoption <> 0;
+        ELSIF NOT ChooseDefaultINI("FTPD", UseTNI) THEN
+            UseTNI := FALSE;
+        END (*IF*);
 
         RETURN UseTNI;
 
@@ -656,8 +669,15 @@ PROCEDURE PerformTheConversions;
 
         (* Get the HashMax value. *)
 
-        Name := "ftpd.ini";
-        hini := OpenINIFile (Name, UseTNI);
+        Name := "FTPD.";
+        IF UseTNI THEN
+            Strings.Append ("TNI", Name);
+        ELSE
+            Strings.Append ("INI", Name);
+        END (*IF*);
+        STextIO.WriteString ("Storing user data from ");
+        STextIO.WriteString (Name);  STextIO.WriteLn;
+        hini := OpenINIFile (Name);
         IF (NOT INIValid(hini)) THEN
             STextIO.WriteString ("Missing INI file.");
             STextIO.WriteLn;
@@ -677,7 +697,12 @@ PROCEDURE PerformTheConversions;
             CloseINIFile (hini);
         ELSE
             count := 0;
-            Name := "ftpd    .ini";
+            Name := "ftpd    .";
+            IF UseTNI THEN
+                Strings.Append ("TNI", Name);
+            ELSE
+                Strings.Append ("INI", Name);
+            END (*IF*);
             FOR j := 0 TO 9999 DO
                 code := j;
                 FOR k := 7 TO 4 BY -1 DO
@@ -685,7 +710,7 @@ PROCEDURE PerformTheConversions;
                     code := code DIV 10;
                 END (*FOR*);
                 IF Exists (Name) THEN
-                    hini := OpenINIFile (Name, UseTNI);
+                    hini := OpenINIFile (Name);
                     INC (count, ConvertFromINIFile (hini, dirname, mask));
                     CloseINIFile (hini);
                 END (*IF*);

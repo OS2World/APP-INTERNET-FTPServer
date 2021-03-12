@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  FtpServer FTP daemon                                                  *)
-(*  Copyright (C) 2018   Peter Moylan                                     *)
+(*  Copyright (C) 2020   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE FDUsers;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            30 August 1997                  *)
-        (*  Last edited:        26 January 2018                 *)
+        (*  Last edited:        26 November 2020                *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (********************************************************)
@@ -75,8 +75,8 @@ FROM Semaphores IMPORT
 FROM FileOps IMPORT
     (* const*)  NoSuchChannel,
     (* type *)  ChanId, FileAttr, FileAttribute, DirectoryEntry,
-    (* proc *)  FirstDirEntry, NextDirEntry, DirSearchDone, FreeSpace,
-                OpenOldFile, OpenNewFile, CloseFile,
+    (* proc *)  FileExists, FirstDirEntry, NextDirEntry, DirSearchDone,
+                FreeSpace, OpenOldFile, OpenNewFile, CloseFile,
                 SetPosition, EndPosition;
 
 FROM Volume IMPORT
@@ -338,7 +338,7 @@ PROCEDURE CategoriseNode (p: DirEntryPtr;  parentpath: ARRAY OF CHAR);
     (* a '/' unless it is empty, is the physical path of this node's parent     *)
     (* directory.  On exit values have been assigned to p^.exists and p^.IsADir.*)
 
-    VAR D: DirectoryEntry;  fullname: FileNameString;
+    VAR fullname: FileNameString;
         InfoBuf: OS2.FSALLOCATE;
 
     BEGIN
@@ -368,11 +368,8 @@ PROCEDURE CategoriseNode (p: DirEntryPtr;  parentpath: ARRAY OF CHAR);
             (* possibilities: this is a file, this is a directory, this *)
             (* is something that doesn't exist on our disk.             *)
 
-            p^.exists := FirstDirEntry (fullname, FALSE, TRUE, D);
-            IF p^.exists THEN
-                p^.IsADir := directory IN D.attr;
-            END (*IF*);
-            DirSearchDone (D);
+            p^.exists := FileExists (fullname, p^.IsADir);
+
         END (*IF*);
         p^.categorised := TRUE;
 
@@ -1457,7 +1454,7 @@ PROCEDURE FileIsADirectory (parent: FName;  name: ARRAY OF CHAR): BOOLEAN;
 
             (* Watch out for wildcard matches! *)
 
-            result := FirstDirEntry (FullName, TRUE, TRUE, D)
+            result := FirstDirEntry (FullName, FALSE, TRUE, TRUE, D)
                          AND (directory IN D.attr)
                          AND TailMatch (name, D.name);
             DirSearchDone (D);
@@ -1917,7 +1914,7 @@ PROCEDURE FileOrDirExists (name: FName;  ShowHidden: BOOLEAN): BOOLEAN;
             RETURN FALSE;
         ELSE
             MakeFullName (name, FullName);
-            result := FirstDirEntry (FullName, FALSE, ShowHidden, D)
+            result := FirstDirEntry (FullName, TRUE, FALSE, ShowHidden, D)
                          AND TailMatch (FullName, D.name)
                          AND (ShowHidden
                              OR NOT ((hidden IN D.attr) OR (system IN D.attr)));
@@ -2433,7 +2430,7 @@ PROCEDURE ListRealDirectory (S: Socket;  U: User;  KeepAlive: Semaphore;
         q := arg^.EntryPtr;
         IF (NOT q^.virtual) OR (q^.link^.this[0] <> Nul) THEN
             MakeFullName (arg, Name);
-            success := FirstDirEntry (Name, TRUE, TRUE, D);
+            success := FirstDirEntry (Name, FALSE, TRUE, TRUE, D);
             WHILE success DO
                 OK := directory IN D.attr;
                 IF OK AND (D.name[0] = '.') THEN
@@ -2496,7 +2493,7 @@ PROCEDURE ListRealDirectory (S: Socket;  U: User;  KeepAlive: Semaphore;
 
                     ELSE
 
-                        IF FirstDirEntry (q^.link^.this, FALSE, TRUE, D) THEN
+                        IF FirstDirEntry (q^.link^.this, TRUE, FALSE, TRUE, D) THEN
                             Strings.Assign (q^.name, D.name);
                             HandleOneEntry (Recurse IN options, q^.flags);
                         END (*IF*);
@@ -2517,7 +2514,7 @@ PROCEDURE ListRealDirectory (S: Socket;  U: User;  KeepAlive: Semaphore;
                         arg^.fname := temp;
                     END (*IF*);
 
-                    IF FirstDirEntry (Name, FALSE, TRUE, D) THEN
+                    IF FirstDirEntry (Name, TRUE, FALSE, TRUE, D) THEN
                         HandleOneEntry (Recurse IN options, q^.flags);
                     END (*IF*);
                     DirSearchDone (D);
@@ -2541,7 +2538,7 @@ PROCEDURE ListRealDirectory (S: Socket;  U: User;  KeepAlive: Semaphore;
         q := arg^.EntryPtr;
         IF (NOT q^.virtual) OR (q^.link^.this[0] <> Nul) THEN
             MakeFullName (arg, Name);
-            success := FirstDirEntry (Name, FALSE, TRUE, D);
+            success := FirstDirEntry (Name, FALSE, FALSE, TRUE, D);
             WHILE success DO
 
                 IF NOT (directory IN D.attr) THEN
@@ -2870,7 +2867,7 @@ PROCEDURE GetFileSize (Name: FName;  trusted: BOOLEAN): CARD64;
     BEGIN
         IF trusted OR MayListFiles(Name) THEN
             MakeFullName (Name, FullName);
-            IF FirstDirEntry (FullName, FALSE, TRUE, D) THEN
+            IF FirstDirEntry (FullName, FALSE, FALSE, TRUE, D) THEN
                 result := D.size;
             ELSE
                 result.low  := MAX(CARDINAL);
@@ -2955,7 +2952,7 @@ PROCEDURE GetDateTime (iname: FName;  VAR (*OUT*) result: ARRAY OF CHAR);
         place := 0;
         IF MayListFiles(iname) THEN
             MakeFullName (iname, FullName);
-            IF FirstDirEntry (FullName, FALSE, TRUE, D) THEN
+            IF FirstDirEntry (FullName, FALSE, FALSE, TRUE, D) THEN
                 WITH date DO
                     year := D.datePkd;
                     day := year MOD 32;  year := year DIV 32;

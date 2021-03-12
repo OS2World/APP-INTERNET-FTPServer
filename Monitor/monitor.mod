@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Monitor for FtpServer                                                 *)
-(*  Copyright (C) 2018   Peter Moylan                                     *)
+(*  Copyright (C) 2020   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -27,7 +27,7 @@ MODULE Monitor;
         (*             FtpServer Monitor - PM version               *)
         (*                                                          *)
         (*    Started:        26 March 2000                         *)
-        (*    Last edited:    10 December 2017                      *)
+        (*    Last edited:    20 November 2020                      *)
         (*    Status:         OK                                    *)
         (*                                                          *)
         (************************************************************)
@@ -115,7 +115,7 @@ PROCEDURE GetParameters;
                 INIFileName := "MONITOR.INI";
             END (*IF*);
         END (*IF*);
-        SetINIFileName (INIFileName, TNImode);
+        SetINIFileName (INIFileName);
     END GetParameters;
 
 (********************************************************************************)

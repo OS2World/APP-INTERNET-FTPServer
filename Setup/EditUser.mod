@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Setup for FtpServer                                                   *)
-(*  Copyright (C) 2018   Peter Moylan                                     *)
+(*  Copyright (C) 2019   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE EditUser;
         (*          Dialogue to edit the data for one user          *)
         (*                                                          *)
         (*    Started:        25 October 1999                       *)
-        (*    Last edited:    9 December 2018                       *)
+        (*    Last edited:    19 October 2019                       *)
         (*    Status:         OK                                    *)
         (*                                                          *)
         (************************************************************)
@@ -459,7 +459,7 @@ PROCEDURE LoadDialogueData (hwnd: OS2.HWND;  username: ARRAY OF CHAR;
 
         CloseINIFile;
 
-        User.UIPList := IPFilters.LoadIPFilterList (username);
+        User.UIPList := IPFilters.LoadIPFilterList (username, "IPfilter");
         IF (User.UIPList = NIL) OR (User.UIPList^.next = NIL) THEN
             OS2.WinSetDlgItemText (hwnd, DID.EditUIPListButton, "Add IP address controls");
         ELSE
@@ -663,7 +663,7 @@ PROCEDURE CommitChanges;
         ELSE
             Tree.SavePermissions (User.name, User.UserTreeRoot);
         END (*IF*);
-        IPFilters.StoreIPFilterList (User.name, User.UIPList);
+        IPFilters.StoreIPFilterList (User.name, "IPfilter", User.UIPList);
         HideList.StoreList (User.name, User.HideList);
         CloseINIFile;
     END CommitChanges;

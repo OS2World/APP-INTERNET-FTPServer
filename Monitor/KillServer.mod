@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Monitor for FtpServer                                                 *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2020   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE KillServer;
         (*                    "Kill server" dialogue                    *)
         (*                                                              *)
         (*    Started:        3 April 2000                              *)
-        (*    Last edited:    19 November 2009                          *)
+        (*    Last edited:    20 November 2020                          *)
         (*    Status:         OK                                        *)
         (*                                                              *)
         (****************************************************************)
@@ -103,7 +103,7 @@ PROCEDURE RunDialogue (parent: OS2.HWND): CARDINAL;
     (*     1    gradual shutdown                                *)
     (*     2    quick shutdown                                  *)
 
-    VAR hwnd: OS2.HWND;  UseTNI: BOOLEAN;
+    VAR hwnd: OS2.HWND;
         ININame: ARRAY [0..511] OF CHAR;
 
     BEGIN
@@ -113,8 +113,8 @@ PROCEDURE RunDialogue (parent: OS2.HWND): CARDINAL;
                        DID.KillServerDialogue,    (* dialogue ID *)
                        NIL);               (* creation parameters *)
 
-        GetINIFileName (ININame, UseTNI);
-        INIData.SetInitialWindowPosition (hwnd, ININame, "KillServer", UseTNI);
+        GetINIFileName (ININame);
+        INIData.SetInitialWindowPosition (hwnd, ININame, "KillServer");
 
         (* Set the check buttons correctly. *)
 
@@ -125,7 +125,7 @@ PROCEDURE RunDialogue (parent: OS2.HWND): CARDINAL;
 
         ResultCode := 1;
         OS2.WinProcessDlg(hwnd);
-        INIData.StoreWindowPosition (hwnd, ININame, "KillServer", UseTNI);
+        INIData.StoreWindowPosition (hwnd, ININame, "KillServer");
         OS2.WinDestroyWindow (hwnd);
         RETURN ResultCode;
 

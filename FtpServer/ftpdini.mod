@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  FtpServer FTP daemon                                                  *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2019   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -29,7 +29,7 @@ IMPLEMENTATION MODULE FtpdINI;
         (*   The actual INI file operations are done by INIData     *)
         (*                                                          *)
         (*      Started:        28 January 2002                     *)
-        (*      Last edited:    5 February 2015                     *)
+        (*      Last edited:    2 October 2019                      *)
         (*      Status:         OK                                  *)
         (*                                                          *)
         (************************************************************)
@@ -44,31 +44,35 @@ CONST Nul = CHR(0);
 VAR
     INIFilename, Basename: Names.FilenameString;
     HashMax: CARDINAL;
-    UseTNI: BOOLEAN;
 
 (************************************************************************)
 
-PROCEDURE SetINIFileName (name: ARRAY OF CHAR;  TNImode: BOOLEAN);
+PROCEDURE SetINIFileName (name: ARRAY OF CHAR);
 
     (* Specifies the name of the file to be opened by OpenINIFile. *)
 
+    VAR k: CARDINAL;  TNImode: BOOLEAN;
+
     BEGIN
-        UseTNI := TNImode;
+        k := LENGTH(name) - 3;
+        TNImode := CAP(name[k]) = 'T';
         Strings.Assign (name, INIFilename);
         Strings.Assign (name, Basename);
         Basename[4] := Nul;
         Strings.Append ("    .INI", Basename);
+        k := LENGTH(Basename) - 3;
+        IF TNImode THEN
+            Basename[k] := 'T';
+        END (*IF*);
     END SetINIFileName;
 
 (************************************************************************)
 
-PROCEDURE GetINIFileName (VAR (*OUT*) name: ARRAY OF CHAR;
-                               VAR (*OUT*) TNImode: BOOLEAN);
+PROCEDURE GetINIFileName (VAR (*OUT*) name: ARRAY OF CHAR);
 
     (* Returns the name of the INI or TNI file. *)
 
     BEGIN
-        TNImode := UseTNI;
         Strings.Assign (INIFilename, name);
     END GetINIFileName;
 
@@ -91,10 +95,10 @@ PROCEDURE OpenINIFile(): INIData.HINI;
     VAR hini: INIData.HINI;
 
     BEGIN
-        hini := INIData.OpenINIFile (INIFilename, UseTNI);
+        hini := INIData.OpenINIFile (INIFilename);
         (*
         IF NOT INIData.INIValid(hini) THEN
-            hini := INIData.CreateINIFile (INIFilename, UseTNI);
+            hini := INIData.CreateINIFile (INIFilename);
         END (*IF*);
         *)
         RETURN hini;
@@ -161,9 +165,9 @@ PROCEDURE OpenINIForUser (name: ARRAY OF CHAR;
             END (*FOR*);
 
         END (*IF*);
-        hini := INIData.OpenINIFile (INIname, UseTNI);
+        hini := INIData.OpenINIFile (INIname);
         IF (NOT INIData.INIValid(hini)) AND CreateIfNotExists THEN
-            hini := INIData.CreateINIFile (INIname, UseTNI);
+            hini := INIData.CreateINIFile (INIname);
         END (*IF*);
 
         RETURN hini;
@@ -175,8 +179,7 @@ PROCEDURE OpenINIForUser (name: ARRAY OF CHAR;
 (************************************************************************)
 
 BEGIN
-    UseTNI := FALSE;
-    SetINIFileName ("FTPD.INI", UseTNI);
+    SetINIFileName ("FTPD.INI");
     HashMax := 0;
 END FtpdINI.
 

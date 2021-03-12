@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Setup for FtpServer                                                   *)
-(*  Copyright (C) 2019   Peter Moylan                                     *)
+(*  Copyright (C) 2020   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -27,13 +27,13 @@ MODULE Setup;
         (*                   PM Setup for FtpServer                 *)
         (*                                                          *)
         (*    Started:        7 October 1999                        *)
-        (*    Last edited:    1 April 2019                          *)
+        (*    Last edited:    14 December 2020                      *)
         (*    Status:         OK                                    *)
         (*                                                          *)
         (************************************************************)
 
 
-IMPORT OS2, OS2RTL, FSUINI, OpeningDialogue, CommonSettings, IOChan, TextIO;
+IMPORT OS2, OS2RTL, OpeningDialogue, CommonSettings, IOChan, TextIO;
 
 FROM PMInit IMPORT
     (* proc *)  OurHab;
@@ -122,11 +122,9 @@ PROCEDURE GetParameters (VAR (*OUT*) LocalRemote: CARDINAL;
 
 VAR LocalRemote: CARDINAL;
     UseTNI, explicit: BOOLEAN;
-    ININame: ARRAY [0..8] OF CHAR;
 
 BEGIN
     hab := OurHab();
-    ININame := "FTPD.INI";
 
     (* NOTE:  clean up from here is handled by the DosExitList processing *)
     (* Since signal exceptions are not handled by RTS yet, using module   *)
@@ -135,16 +133,20 @@ BEGIN
 
     UseTNI := FALSE;
     GetParameters (LocalRemote, UseTNI, explicit);
+
+    (* We can now make the INI/TNI decision for the Setup INI file.  For    *)
+    (* the main ftpd INI file the INI/TNI decision has to wait until we are *)
+    (* certain about remote operation, and that will not be finalised until *)
+    (* we are in the OpeningDialogue module.                                *)
+
     IF explicit THEN
         CommitTNIDecision ("SETUP", UseTNI);
-        CommitTNIDecision ("FTPD", UseTNI);
-    ELSIF NOT ChooseDefaultINI ("FTPD", UseTNI) THEN
+    ELSIF NOT ChooseDefaultINI ("SETUP", UseTNI) THEN
         UseTNI := FALSE;
     END (*IF*);
-
-    FSUINI.SetINIFileName (ININame, UseTNI);
     CommonSettings.SetDefaultFont (UseTNI);
-    OpeningDialogue.CreateMainDialogue (LocalRemote, UseTNI);
+
+    OpeningDialogue.CreateOpeningDialogue (LocalRemote, UseTNI, explicit);
 
     (* Get/Dispatch Message loop *)
 

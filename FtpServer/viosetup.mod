@@ -28,7 +28,7 @@ MODULE VIOSetup;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            22 January 1998                 *)
-        (*  Last edited:        16 March 2019                   *)
+        (*  Last edited:        10 June 2019                    *)
         (*  Status:             OK                              *)
         (*                                                      *)
         (********************************************************)
@@ -266,7 +266,7 @@ PROCEDURE PostUpdated (semName: ARRAY OF CHAR);
 
     (* Posts on a public event semaphore. *)
 
-    VAR changehev: OS2.HEV;  count: CARDINAL;
+    VAR changehev: OS2.HEV;
 
     BEGIN
         changehev := 0;
@@ -274,7 +274,6 @@ PROCEDURE PostUpdated (semName: ARRAY OF CHAR);
             OS2.DosCreateEventSem (semName, changehev, OS2.DC_SEM_SHARED, FALSE);
         END (*IF*);
         OS2.DosPostEventSem (changehev);
-        OS2.DosResetEventSem (changehev, count);
         OS2.DosCloseEventSem(changehev);
     END PostUpdated;
 

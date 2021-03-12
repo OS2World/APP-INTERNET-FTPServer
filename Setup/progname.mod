@@ -31,7 +31,7 @@ IMPLEMENTATION MODULE ProgName;
     (*       while the library modules still live at                *)
     (*       "library" level of the source structure.               *)
     (*                                                              *)
-    (*    Last edited:    6 January 2013                            *)
+    (*    Last edited:    19 November 2020                          *)
     (*    Status:         OK                                        *)
     (*                                                              *)
     (****************************************************************)
@@ -44,8 +44,6 @@ IMPORT Strings;
 PROCEDURE GetProgramName (VAR (*OUT*) name: ARRAY OF CHAR);
 
     (* Returns a name and version string. *)
-
-    VAR ProgVersion: ARRAY [0..31] OF CHAR;
 
     BEGIN
         Strings.Assign ("FTPServer Setup", name);

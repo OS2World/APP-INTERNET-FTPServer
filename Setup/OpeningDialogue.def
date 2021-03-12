@@ -5,19 +5,25 @@ DEFINITION MODULE OpeningDialogue;
         (*                      Opening dialogue                        *)
         (*                                                              *)
         (*    Started:        7 October 1999                            *)
-        (*    Last edited:    13 November 2009                          *)
+        (*    Last edited:    14 December 2020                          *)
         (*    Status:         OK                                        *)
         (*                                                              *)
         (****************************************************************)
 
 
-PROCEDURE CreateMainDialogue (LocalRemote: CARDINAL;  TNImode: BOOLEAN);
+PROCEDURE CreateOpeningDialogue (LocalRemote: CARDINAL;  TNImode, explicit: BOOLEAN);
 
-    (* Creates the main dialogue box.  The meaning of LocalRemote is:    *)
-    (*         0   let user specify local or remote                      *)
-    (*         1   force local setup                                     *)
-    (*         2   force remote setup                                    *)
-    (*         3   force whichever was used last time                    *)
+    (* Creates the main dialogue box.  The meaning of LocalRemote is:   *)
+    (*         0   let user specify local or remote                     *)
+    (*         1   force local setup                                    *)
+    (*         2   force remote setup                                   *)
+    (*         3   force whichever was used last time                   *)
+
+    (* TNImode specifies the INI/TNI mode that has already been chosen  *)
+    (* for Setup.  It is this module's starting point for choosing      *)
+    (* whether to use FTPD.INI or FTPD.TNI.  The variable explicit is   *)
+    (* TRUE iff the Setup program has been called with a -I or -T       *)
+    (* parameter.                                                       *)
 
 END OpeningDialogue.
 

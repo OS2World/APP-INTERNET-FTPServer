@@ -6,7 +6,7 @@ DEFINITION MODULE FtpTransfers;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            24 August 1997                  *)
-        (*  Last edited:        26 January 2018                 *)
+        (*  Last edited:        24 October 2019                 *)
         (*  Status:             OK                              *)
         (*                                                      *)
         (********************************************************)
@@ -59,15 +59,13 @@ PROCEDURE SetPassivePortRange (limit: BOOLEAN;  portmin, portmax: CARD16);
     (* passive ftp.  If limit is FALSE, we let the tcp/ip stack choose  *)
     (* a port for us.                                                   *)
 
-PROCEDURE SetBehindFirewall (enable: BOOLEAN;
-                            MinLocalAddr, MaxLocalAddr, IPAddr: CARDINAL);
+PROCEDURE SetBehindFirewall (enable: BOOLEAN;  IPAddr: CARDINAL);
 
     (* If enable is TRUE, then IPAddr is the address that we report in  *)
-    (* the PASV response.  Exception: if the client address is in the   *)
-    (* range MinLocalAddr to MaxLocalAddr, inclusive, the "behind       *)
-    (* firewall" rules are not applied.  The three numeric values are   *)
+    (* the PASV response.  Exception: the "behind firewall" rules are   *)
+    (* not applied if the client address is a local address.  IPAddr is *)
     (* in network byte order.                                           *)
-    (* If enable is FALSE, the numeric parameters have no effect.       *)
+    (* If enable is FALSE, the IPAddr parameter has no effect.          *)
 
 PROCEDURE CreateSession (S: Socket;  UserNumber: CARDINAL;
                                LogID: TransactionLogID;

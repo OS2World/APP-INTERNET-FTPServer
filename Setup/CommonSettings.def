@@ -6,7 +6,7 @@ DEFINITION MODULE CommonSettings;
         (*             Data common to the main Setup notebook           *)
         (*                                                              *)
         (*    Started:        20 October 2003                           *)
-        (*    Last edited:    7 November 2008                           *)
+        (*    Last edited:    21 October 2019                           *)
         (*    Status:         OK                                        *)
         (*                                                              *)
         (****************************************************************)
@@ -16,6 +16,7 @@ FROM OS2 IMPORT WM_USER, HWND;
 
 CONST
     FONTCHANGED = WM_USER + 1;
+    BEHINDFIREWALL = WM_USER + 2;
     FontNameSize = 256;
 
 TYPE

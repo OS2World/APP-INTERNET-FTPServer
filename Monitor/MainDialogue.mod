@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Monitor for FtpServer                                                 *)
-(*  Copyright (C) 2018   Peter Moylan                                     *)
+(*  Copyright (C) 2020   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -27,7 +27,7 @@ IMPLEMENTATION MODULE MainDialogue;
         (*                        Main dialogue                         *)
         (*                                                              *)
         (*    Started:        29 March 2000                             *)
-        (*    Last edited:    19 December 2018                          *)
+        (*    Last edited:    20 November 2020                          *)
         (*    Status:         OK                                        *)
         (*                                                              *)
         (****************************************************************)
@@ -1131,7 +1131,6 @@ PROCEDURE Create;
 
     VAR hwnd: OS2.HWND;
         pid: OS2.PID;  tid: OS2.TID;
-        TNImode: BOOLEAN;
         INIname: ARRAY [0..511] OF CHAR;
 
     BEGIN
@@ -1158,14 +1157,14 @@ PROCEDURE Create;
             bProgType     := 0;
         END (*WITH*);
         OS2.WinCreateSwitchEntry (Init.MainHab(), SwitchData);
-        GetINIFileName (INIname, TNImode);
-        INIData.SetInitialWindowPosition (hwnd, INIname, "Main", TNImode);
-        INIData.SetInitialWindowSize (hwnd, INIname, "Main", TNImode);
+        GetINIFileName (INIname);
+        INIData.SetInitialWindowPosition (hwnd, INIname, "Main");
+        INIData.SetInitialWindowSize (hwnd, INIname, "Main");
         OS2.WinShowWindow (hwnd, TRUE);
 
         OS2.WinProcessDlg(hwnd);
-        INIData.StoreWindowPosition (hwnd, INIname, "Main", TNImode);
-        INIData.StoreWindowSize (hwnd, INIname, "Main", TNImode);
+        INIData.StoreWindowPosition (hwnd, INIname, "Main");
+        INIData.StoreWindowSize (hwnd, INIname, "Main");
         OS2.WinDestroyWindow (hwnd);
 
     END Create;

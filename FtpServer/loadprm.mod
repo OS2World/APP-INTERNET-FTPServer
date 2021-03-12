@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  LoadPRM utility for FtpServer                                         *)
-(*  Copyright (C) 2015   Peter Moylan                                     *)
+(*  Copyright (C) 2020   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ MODULE LoadPRM;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            5 March 1998                    *)
-        (*  Last edited:        5 February 2015                 *)
+        (*  Last edited:        5 December 2020                 *)
         (*  Status:             Working                         *)
         (*                                                      *)
         (********************************************************)
@@ -42,8 +42,6 @@ MODULE LoadPRM;
 (*     <diritem>    ->  <dirname> <dirrule>                             *)
 (*     <dirname>    ->  <namestring>  |  <namestring> = <namestring>    *)
 (*     <dirrule>   -> { <permission> }* { ( <dirlist> ) }               *)
-(*     <dirlist>   ->  <diritem> { , <diritem> }*                       *)
-(*     <dirlist>   -> { <diritem> }+                                    *)
 (*     <permission> ->  V+ | V- | R+ | R- | W- | W+ | D- | D+ | N- | N+ *)
 (*     <namestring> ->  <string1> | " <string2> " | ' <string3> '       *)
 (*     <string1>   -> any string not including space char               *)
@@ -69,7 +67,8 @@ FROM FtpdINI IMPORT
 
 FROM INIData IMPORT
     (* type *)  HINI,
-    (* proc *)  INIValid, INIGet, INIPut, INIPutString, INIPutBinary;
+    (* proc *)  INIValid, ChooseDefaultINI,
+                INIGet, INIPut, INIPutString, INIPutBinary;
 
 FROM Storage IMPORT
     (* proc *)  ALLOCATE, DEALLOCATE;
@@ -1145,7 +1144,7 @@ PROCEDURE GetParameter (VAR (*OUT*) result: ARRAY OF CHAR): BOOLEAN;
 
     CONST Testing = FALSE;
 
-    VAR args: IOChan.ChanId;  k: CARDINAL;
+    VAR args: IOChan.ChanId;  k, TNIoption: CARDINAL;
         UseTNI: BOOLEAN;
 
     BEGIN
@@ -1160,14 +1159,21 @@ PROCEDURE GetParameter (VAR (*OUT*) result: ARRAY OF CHAR): BOOLEAN;
             END (*IF*);
         END (*IF*);
 
-        (* Check for -t option. *)
+        TNIoption := 2;              (* meaning "no decision yet" *)
+
+        (* Check for -i or -t option. *)
 
         UseTNI := FALSE;
         k := 0;
         WHILE result[k] = ' ' DO INC (k) END (*WHILE*);
-        IF (result[k] = '-') AND (CAP(result[k+1]) = 'T') THEN
-            UseTNI := TRUE;
-            INC (k, 2);
+        IF result[k] = '-' THEN
+            INC (k);
+            IF CAP(result[k]) = 'I' THEN
+                TNIoption := 0;
+            ELSIF CAP(result[k]) = 'T' THEN
+                TNIoption := 1;
+            END (*IF*);
+            INC (k);
             WHILE result[k] = ' ' DO INC (k) END (*WHILE*);
             Strings.Delete (result, 0, k);
         END (*IF*);
@@ -1179,6 +1185,12 @@ PROCEDURE GetParameter (VAR (*OUT*) result: ARRAY OF CHAR): BOOLEAN;
             DEC (k);
         END (*WHILE*);
         result[k] := CHR(0);
+
+        IF TNIoption < 2 THEN
+            UseTNI := TNIoption <> 0;
+        ELSIF NOT ChooseDefaultINI("FTPD", UseTNI) THEN
+            UseTNI := FALSE;
+        END (*IF*);
 
         RETURN UseTNI;
 
@@ -1198,7 +1210,16 @@ PROCEDURE PerformTheConversions;
 
     BEGIN
         UseTNI := GetParameter (mask);
-        SetINIFileName ("ftpd.ini", UseTNI);
+        filename := "FTPD.";
+        IF UseTNI THEN
+            Strings.Append ("TNI", filename);
+        ELSE
+            Strings.Append ("INI", filename);
+        END (*IF*);
+        SetINIFileName (filename);
+        STextIO.WriteString ("Loading user data into ");
+        STextIO.WriteString (filename);  STextIO.WriteLn;
+
         hini := OpenINIFile();
         app := "$SYS";
         HashMax := 0;
@@ -1250,7 +1271,7 @@ PROCEDURE PerformTheConversions;
 
         (* We have a loop below in case of wildcards in the mask. *)
 
-        IF FileOps.FirstDirEntry (mask, FALSE, FALSE, D) THEN
+        IF FileOps.FirstDirEntry (mask, FALSE, FALSE, FALSE, D) THEN
             REPEAT
                 Strings.Assign (dirname, filename);
                 Strings.Append (D.name, filename);

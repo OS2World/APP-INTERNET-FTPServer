@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Setup for FtpServer                                                   *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2019   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE OptionPage;
         (*                    Page 2 of the notebook                    *)
         (*                                                              *)
         (*        Started:        10 October 1999                       *)
-        (*        Last edited:    9 June 2011                           *)
+        (*        Last edited:    23 October 2019                       *)
         (*        Status:         OK                                    *)
         (*                                                              *)
         (****************************************************************)
@@ -59,7 +59,7 @@ FROM Inet2Misc IMPORT
 (**************************************************************************)
 
 VAR
-    pagehandle: OS2.HWND;
+    pagehandle, hwndParent: OS2.HWND;
     OldBindAddr: CARDINAL;
     OldCheckTaggers: BOOLEAN;
     OldHidePasswords: BOOLEAN;
@@ -67,7 +67,6 @@ VAR
     OldLimitPASVPorts: BOOLEAN;
     PortLimitNeverSet: BOOLEAN;
     ChangeInProgress: BOOLEAN;
-    OldMinLocalAddr, OldMaxLocalAddr, OldFirewallIPAddr: CARDINAL;
     OldMinPort, OldMaxPort: CARD16;
 
 (**************************************************************************)
@@ -86,25 +85,6 @@ PROCEDURE EnablePortRangeFields (hwnd: OS2.HWND;  enable: BOOLEAN);
             OS2.WinEnableWindow (OS2.WinWindowFromID(hwnd, DID.MaxPort), FALSE);
         END (*IF*);
     END EnablePortRangeFields;
-
-(**************************************************************************)
-
-PROCEDURE EnableFirewallFields (hwnd: OS2.HWND;  enable: BOOLEAN);
-
-    (* Enables or disables the entry fields associated with the         *)
-    (* firewall option.                                                 *)
-
-    BEGIN
-        IF enable THEN
-            OS2.WinEnableWindow (OS2.WinWindowFromID(hwnd, DID.MinLocalAddr), TRUE);
-            OS2.WinEnableWindow (OS2.WinWindowFromID(hwnd, DID.MaxLocalAddr), TRUE);
-            OS2.WinEnableWindow (OS2.WinWindowFromID(hwnd, DID.FirewallIPAddr), TRUE);
-        ELSE
-            OS2.WinEnableWindow (OS2.WinWindowFromID(hwnd, DID.MinLocalAddr), FALSE);
-            OS2.WinEnableWindow (OS2.WinWindowFromID(hwnd, DID.MaxLocalAddr), FALSE);
-            OS2.WinEnableWindow (OS2.WinWindowFromID(hwnd, DID.FirewallIPAddr), FALSE);
-        END (*IF*);
-    END EnableFirewallFields;
 
 (**************************************************************************)
 
@@ -183,7 +163,8 @@ PROCEDURE LoadValues (hwnd: OS2.HWND);
         END (*IF*);
         OS2.WinSendDlgItemMsg (hwnd, DID.BehindFirewall, OS2.BM_SETCHECK,
                              OS2.MPFROMSHORT(ORD(boolval)), NIL);
-        EnableFirewallFields (hwnd, boolval);
+        OS2.WinPostMsg (hwndParent, CommonSettings.BEHINDFIREWALL,
+                            OS2.MPFROMLONG(ORD(boolval)), OS2.MPFROMLONG(0));
 
         (* Option to limit the PASV port range (Boolean value). *)
 
@@ -220,30 +201,6 @@ PROCEDURE LoadValues (hwnd: OS2.HWND);
 
         (* Numeric values associated with BehindFirewall option. *)
 
-        IF INIGetCard ('$SYS', 'MinLocalAddr', value) THEN
-            OldMinLocalAddr := value;
-        ELSE
-            value := OurHostID;
-        END (*IF*);
-        CardinalToDotted (value, AddressString);
-        OS2.WinSetDlgItemText (hwnd, DID.MinLocalAddr, AddressString);
-
-        IF INIGetCard ('$SYS', 'MaxLocalAddr', value) THEN
-            OldMaxLocalAddr := value;
-        ELSE
-            value := OurHostID;
-        END (*IF*);
-        CardinalToDotted (value, AddressString);
-        OS2.WinSetDlgItemText (hwnd, DID.MaxLocalAddr, AddressString);
-
-        IF INIGetCard ('$SYS', 'FirewallIPAddr', value) THEN
-            OldFirewallIPAddr := value;
-        ELSE
-            value := OurHostID;
-        END (*IF*);
-        CardinalToDotted (value, AddressString);
-        OS2.WinSetDlgItemText (hwnd, DID.FirewallIPAddr, AddressString);
-
         CloseINIFile;
 
     END LoadValues;
@@ -255,7 +212,7 @@ PROCEDURE StoreData (hwnd: OS2.HWND);
     (* Stores the values on page 2 back into the INI file. *)
 
     VAR TextBuffer: ARRAY [0..15] OF CHAR;
-        value, value2, temp: CARDINAL;  val16: CARD16;  boolval: BOOLEAN;
+        value : CARDINAL;  val16: CARD16;  boolval: BOOLEAN;
 
     BEGIN
         OpenINIFile;
@@ -296,36 +253,7 @@ PROCEDURE StoreData (hwnd: OS2.HWND);
             INIPut ('$SYS', 'LimitPASVPorts', boolval);
         END (*IF*);
 
-        (* BehindFirewall (Boolean value). *)
-
-        boolval := OS2.LONGFROMMR (OS2.WinSendDlgItemMsg (hwnd, DID.BehindFirewall,
-                                    OS2.BM_QUERYCHECK, NIL, NIL)) <> 0;
-        IF boolval <> OldBehindFirewall THEN
-            INIPut ('$SYS', 'BehindFirewall', boolval);
-        END (*IF*);
-
-        (* Numeric values associated with BehindFirewall option. *)
-
-        OS2.WinQueryDlgItemText (hwnd, DID.MinLocalAddr, 16, TextBuffer);
-        value := StringToIPAddress (TextBuffer);
-        OS2.WinQueryDlgItemText (hwnd, DID.MaxLocalAddr, 16, TextBuffer);
-        value2 := StringToIPAddress (TextBuffer);
-        IF Swap4(value2) < Swap4(value) THEN
-            temp := value2;  value2 := value;  value := temp;
-        END (*IF*);
-
-        IF value <> OldMinLocalAddr THEN
-            INIPut ('$SYS', 'MinLocalAddr', value);
-        END (*IF*);
-        IF value2 <> OldMaxLocalAddr THEN
-            INIPut ('$SYS', 'MaxLocalAddr', value2);
-        END (*IF*);
-
-        OS2.WinQueryDlgItemText (hwnd, DID.FirewallIPAddr, 16, TextBuffer);
-        value := StringToIPAddress (TextBuffer);
-        IF value <> OldFirewallIPAddr THEN
-            INIPut ('$SYS', 'FirewallIPAddr', value);
-        END (*IF*);
+        (* Numeric values for the PASV port restriction. *)
 
         WinQueryDlgItemCard (hwnd, DID.MinPort, value);
         val16 := Swap2(VAL(CARD16, value));
@@ -337,6 +265,14 @@ PROCEDURE StoreData (hwnd: OS2.HWND);
         val16 := Swap2(VAL(CARD16, value));
         IF val16 <> OldMaxPort THEN
             INIPut ('$SYS', 'MaxPort', val16);
+        END (*IF*);
+
+        (* BehindFirewall (Boolean value). *)
+
+        boolval := OS2.LONGFROMMR (OS2.WinSendDlgItemMsg (hwnd, DID.BehindFirewall,
+                                    OS2.BM_QUERYCHECK, NIL, NIL)) <> 0;
+        IF boolval <> OldBehindFirewall THEN
+            INIPut ('$SYS', 'BehindFirewall', boolval);
         END (*IF*);
 
         CloseINIFile;
@@ -385,12 +321,13 @@ PROCEDURE ["SysCall"] DialogueProc(hwnd     : OS2.HWND
                   | DID.BehindFirewall:
                        ButtonValue := OS2.LONGFROMMR (OS2.WinSendDlgItemMsg (hwnd, DID.BehindFirewall,
                                     OS2.BM_QUERYCHECK, NIL, NIL)) <> 0;
-                       EnableFirewallFields (hwnd, ButtonValue);
                        IF ButtonValue AND PortLimitNeverSet THEN
                            EnablePortRangeFields (hwnd, TRUE);
                            OS2.WinSendDlgItemMsg (hwnd, DID.LimitPASVPorts, OS2.BM_SETCHECK,
                                        OS2.MPFROMSHORT(ORD(TRUE)), NIL);
                        END (*IF*);
+                       OS2.WinPostMsg (hwndParent, CommonSettings.BEHINDFIREWALL,
+                                OS2.MPFROMLONG(ORD(ButtonValue)), OS2.MPFROMSHORT(1));
                        RETURN NIL;
                   | DID.HidePasswords:
                        ButtonValue := OS2.LONGFROMMR (OS2.WinSendDlgItemMsg (hwnd, DID.HidePasswords,
@@ -451,6 +388,7 @@ PROCEDURE CreatePage (notebook: OS2.HWND;  VAR (*OUT*) PageID: CARDINAL): OS2.HW
     VAR Label: ARRAY [0..31] OF CHAR;
 
     BEGIN
+        hwndParent := OS2.WinQueryWindow (notebook, OS2.QW_PARENT);
         pagehandle := OS2.WinLoadDlg(notebook, notebook,
                        DialogueProc,    (* dialogue procedure *)
                        0,                   (* use resources in EXE *)
@@ -488,9 +426,6 @@ BEGIN
     OldBehindFirewall := FALSE;
     OldLimitPASVPorts := FALSE;
     PortLimitNeverSet := TRUE;
-    OldMinLocalAddr := 0;
-    OldMaxLocalAddr := MAX(CARDINAL);
-    OldFirewallIPAddr := 0;
     OldMinPort := Swap2(49152);
     OldMaxPort := Swap2(65535);
     ChangeInProgress := FALSE;

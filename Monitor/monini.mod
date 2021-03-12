@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Monitor for FtpServer                                                 *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2020   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -29,7 +29,7 @@ IMPLEMENTATION MODULE MonINI;
         (*   The actual INI file operations are done by INIData     *)
         (*                                                          *)
         (*      Started:        18 November 2009                    *)
-        (*      Last edited:    19 November 2009                    *)
+        (*      Last edited:    20 November 2020                    *)
         (*      Status:         OK                                  *)
         (*                                                          *)
         (************************************************************)
@@ -43,29 +43,25 @@ CONST Nul = CHR(0);
 
 VAR
     INIFilename: Names.FilenameString;
-    UseTNI: BOOLEAN;
 
 (************************************************************************)
 
-PROCEDURE SetINIFileName (name: ARRAY OF CHAR;  TNImode: BOOLEAN);
+PROCEDURE SetINIFileName (name: ARRAY OF CHAR);
 
     (* Specifies the name of the file to be opened by OpenINIFile. *)
 
     BEGIN
-        UseTNI := TNImode;
         Strings.Assign (name, INIFilename);
     END SetINIFileName;
 
 (************************************************************************)
 
-PROCEDURE GetINIFileName (VAR (*OUT*) name: ARRAY OF CHAR;
-                              VAR (*OUT*) TNImode: BOOLEAN);
+PROCEDURE GetINIFileName (VAR (*OUT*) name: ARRAY OF CHAR);
 
     (* Returns the current INI file name and mode. *)
 
     BEGIN
         Strings.Assign (INIFilename, name);
-        TNImode := UseTNI;
     END GetINIFileName;
 
 (************************************************************************)
@@ -77,9 +73,9 @@ PROCEDURE OpenINIFile(): INIData.HINI;
     VAR hini: INIData.HINI;
 
     BEGIN
-        hini := INIData.OpenINIFile (INIFilename, UseTNI);
+        hini := INIData.OpenINIFile (INIFilename);
         IF NOT INIData.INIValid (hini) THEN
-            hini := INIData.CreateINIFile (INIFilename, UseTNI);
+            hini := INIData.CreateINIFile (INIFilename);
         END (*IF*);
         RETURN hini;
     END OpenINIFile;
@@ -99,7 +95,6 @@ PROCEDURE CloseINIFile (hini: INIData.HINI);
 (************************************************************************)
 
 BEGIN
-    UseTNI := FALSE;
-    SetINIFileName ("MONITOR.INI", UseTNI);
+    SetINIFileName ("MONITOR.INI");
 END MonINI.
 

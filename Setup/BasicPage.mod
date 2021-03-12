@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Setup for FtpServer                                                   *)
-(*  Copyright (C) 2018   Peter Moylan                                     *)
+(*  Copyright (C) 2020   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE BasicPage;
         (*                    Page 1 of the notebook                    *)
         (*                                                              *)
         (*        Started:        8 October 1999                        *)
-        (*        Last edited:    16 December 2018                      *)
+        (*        Last edited:    16 December 2020                      *)
         (*        Status:         OK                                    *)
         (*                                                              *)
         (****************************************************************)
@@ -38,9 +38,12 @@ FROM SYSTEM IMPORT ADDRESS, INT16, CARD32, CAST, ADR;
 
 IMPORT OS2, OS2RTL, DID, Strings, CommonSettings;
 
+FROM UserPage IMPORT
+    (* proc *)  NumberOfUsers;
+
 FROM FSUINI IMPORT
-    (* proc *)  SetINIFileName, OpenINIFile, CloseINIFile,
-                SetHashMax, OpenINIForUser;
+    (* proc *)  ChangeINIFilename, RestoreINIFilename, OpenINIFile, CloseINIFile,
+                TNImode, SetHashMax, OpenINIForUser;
 
 FROM RINIData IMPORT
     (* type *)  StringReadState,
@@ -62,7 +65,7 @@ FROM MiscFuncs IMPORT
     (* proc *)  EVAL, ToLower;
 
 FROM Conversions IMPORT
-    (* proc *)  CardinalToString;
+    (* proc *)  CardinalToStringLJ;
 
 FROM Misc IMPORT
     (* proc *)  WinSetDlgItemCard, WinQueryDlgItemCard;
@@ -282,17 +285,19 @@ PROCEDURE SwitchToSingleINI (status: OS2.HWND);
 
     (* Switches from multiple INI files to a single INI file.     *)
 
-    CONST CountBufferSize = 16;
+    CONST CountSize = 16;
 
     VAR D: DirectoryEntry;
         list, temp: AppPointer;
         count: CARDINAL;
         found: BOOLEAN;
-        CountBuffer: ARRAY [0..CountBufferSize-1] OF CHAR;
+        TotalBuffer: ARRAY [0..CountSize-1] OF CHAR;
+        CountBuffer: ARRAY [0..2*CountSize] OF CHAR;
         mask: ARRAY [0..127] OF CHAR;
 
     BEGIN
         count := 0;
+        CardinalToStringLJ (NumberOfUsers(), TotalBuffer);
         HashMax := 0;
         SetHashMax (0);
         IF UseTNI THEN
@@ -300,8 +305,14 @@ PROCEDURE SwitchToSingleINI (status: OS2.HWND);
         ELSE
             mask := "FTPD*.INI";
         END (*IF*);
-        found := FirstDirEntry (mask, FALSE, TRUE, D);
+        found := FirstDirEntry (mask, FALSE, FALSE, TRUE, D);
         WHILE found DO
+
+            (* Note: it is safe to reuse the variable mask here, because    *)
+            (* the NextDirEntry call below takes only D as a parameter      *)
+            (* and the originally specified mask has been saved by the OS   *)
+            (* as part of the D.dirHandle information.                      *)
+
             IF UseTNI THEN
                 mask := "FTPD.TNI";
             ELSE
@@ -309,13 +320,13 @@ PROCEDURE SwitchToSingleINI (status: OS2.HWND);
             END (*IF*);
             Strings.Capitalize (D.name);
             IF NOT Strings.Equal (D.name, mask) THEN
-                SetINIFileName (D.name, UseTNI);
+                ChangeINIFilename (D.name);
                 OpenINIFile;
                 list := LoadAllINIData();
                 CloseINIFile;
                 DeleteFile (D.name);
 
-                SetINIFileName (mask, UseTNI);
+                RestoreINIFilename;
                 OpenINIFile;
                 WHILE list <> NIL DO
                     ToLower (list^.name);
@@ -326,8 +337,9 @@ PROCEDURE SwitchToSingleINI (status: OS2.HWND);
                     DISPOSE (temp);
                 END (*WHILE*);
                 CloseINIFile;
-                CardinalToString (count, CountBuffer, CountBufferSize-1);
-                CountBuffer[CountBufferSize-1] := Nul;
+                CardinalToStringLJ (count, CountBuffer);
+                Strings.Append ('/', CountBuffer);
+                Strings.Append (TotalBuffer, CountBuffer);
                 OS2.WinSetWindowText (status, CountBuffer);
 
             END (*IF*);
@@ -348,14 +360,16 @@ PROCEDURE SwitchToMultipleINI (status: OS2.HWND);
     (* Switches from a single INI file to multiple INI files.     *)
 
     CONST GroupSize = 20;
-          CountBufferSize = 16;
+          CountSize = 16;
 
     VAR list, current, temp: AppPointer;
         count, subcount: CARDINAL;
-        CountBuffer: ARRAY [0..CountBufferSize-1] OF CHAR;
+        TotalBuffer: ARRAY [0..CountSize-1] OF CHAR;
+        CountBuffer: ARRAY [0..2*CountSize] OF CHAR;
 
     BEGIN
         count := 0;
+        CardinalToStringLJ (NumberOfUsers(), TotalBuffer);
         HashMax := NewHashMax;
         SetHashMax (HashMax);
         OpenINIFile;
@@ -390,8 +404,9 @@ PROCEDURE SwitchToMultipleINI (status: OS2.HWND);
                 DISPOSE (temp);
             END (*WHILE*);
             INC (count, subcount);
-            CardinalToString (count, CountBuffer, CountBufferSize-1);
-            CountBuffer[CountBufferSize-1] := Nul;
+            CardinalToStringLJ (count, CountBuffer);
+            Strings.Append ('/', CountBuffer);
+            Strings.Append (TotalBuffer, CountBuffer);
             OS2.WinSetWindowText (status, CountBuffer);
 
         END (*LOOP*);
@@ -697,15 +712,14 @@ PROCEDURE ["SysCall"] DialogueProc (hwnd: OS2.HWND;  msg: OS2.ULONG;
 
 (**************************************************************************)
 
-PROCEDURE CreatePage (notebook: OS2.HWND;  TNImode: BOOLEAN;
-                       VAR (*OUT*) PageID: CARDINAL): OS2.HWND;
+PROCEDURE CreatePage (notebook: OS2.HWND;  VAR (*OUT*) PageID: CARDINAL): OS2.HWND;
 
     (* Creates page 1 and adds it to the notebook. *)
 
     VAR Label: ARRAY [0..31] OF CHAR;
 
     BEGIN
-        UseTNI := TNImode;
+        UseTNI := TNImode();
         pagehandle := OS2.WinLoadDlg(notebook, notebook,
                        DialogueProc,    (* dialogue procedure *)
                        0,                   (* use resources in EXE *)

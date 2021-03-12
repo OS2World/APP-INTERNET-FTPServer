@@ -7,7 +7,7 @@ DEFINITION MODULE MonINI;
         (*   The actual INI file operations are done by INIData     *)
         (*                                                          *)
         (*      Started:        18 November 2009                    *)
-        (*      Last edited:    18 November 2009                    *)
+        (*      Last edited:    20 November 2020                    *)
         (*      Status:         OK                                  *)
         (*                                                          *)
         (************************************************************)
@@ -15,12 +15,11 @@ DEFINITION MODULE MonINI;
 
 FROM INIData IMPORT (* type *) HINI;
 
-PROCEDURE SetINIFileName (name: ARRAY OF CHAR;  TNImode: BOOLEAN);
+PROCEDURE SetINIFileName (name: ARRAY OF CHAR);
 
     (* Specifies the name of the file to be opened by OpenINIFile. *)
 
-PROCEDURE GetINIFileName (VAR (*OUT*) name: ARRAY OF CHAR;
-                              VAR (*OUT*) TNImode: BOOLEAN);
+PROCEDURE GetINIFileName (VAR (*OUT*) name: ARRAY OF CHAR);
 
     (* Returns the current INI file name and mode. *)
 

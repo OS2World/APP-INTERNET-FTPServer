@@ -539,7 +539,7 @@ PROCEDURE SessionHandler (arg: ADDRESS);
 
         (* Check for acceptable client address. *)
 
-        IF NOT ClientAddressAcceptable (IPAddress) THEN
+        IF NOT ClientAddressAcceptable(IPAddress) THEN
             Sleep (BannedHostDelay);
             Strings.Assign ("Client address rejected ", LogMessage);
             Strings.Append (IPBuffer, LogMessage);

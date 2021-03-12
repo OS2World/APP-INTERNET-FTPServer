@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Setup for FtpServer                                                   *)
-(*  Copyright (C) 2019   Peter Moylan                                     *)
+(*  Copyright (C) 2020   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE UserPage;
         (*                 User page of the notebook                    *)
         (*                                                              *)
         (*        Started:        11 October 1999                       *)
-        (*        Last edited:    31 March 2019                         *)
+        (*        Last edited:    16 December 2020                      *)
         (*        Status:         OK                                    *)
         (*                                                              *)
         (****************************************************************)
@@ -39,8 +39,8 @@ FROM SYSTEM IMPORT CARD16, ADDRESS, CAST, ADR;
 IMPORT OS2, OS2RTL, Strings, DID, BasicPage, EditUser, CommonSettings, WideUserDialogue, WU2Dialogue;
 
 FROM FSUINI IMPORT
-    (* proc *)  SetINIFileName, SetHashMax, IsMultiFileMode,
-                OpenINIFile, OpenINIForUser, CloseINIFile;
+    (* proc *)  SetHashMax, IsMultiFileMode, ChangeINIFilename, RestoreINIFilename,
+                TNImode, OpenINIFile, OpenINIForUser, CloseINIFile;
 
 FROM RINIData IMPORT
     (* type *)  StringReadState,
@@ -73,7 +73,7 @@ TYPE
 VAR
     pagehandle: OS2.HWND;
     UserCount: CARDINAL;
-    UseTNI, ChangeInProgress: BOOLEAN;
+    ChangeInProgress: BOOLEAN;
 
 (************************************************************************)
 
@@ -116,6 +116,16 @@ PROCEDURE WriteHex (hwnd: OS2.HWND;  to: CARDINAL;  N: CARDINAL);
         OS2.WinSetWindowText (w, text);
     END WriteHex;
 *)
+
+(************************************************************************)
+
+PROCEDURE NumberOfUsers (): CARDINAL;
+
+    (* Returns the number of users. *)
+
+    BEGIN
+        RETURN UserCount;
+    END NumberOfUsers;
 
 (************************************************************************)
 
@@ -222,12 +232,12 @@ PROCEDURE LoadValues (hwnd: OS2.HWND);
         SetHashMax (N);
         IF MultiFileMode THEN
             CloseINIFile;
-            IF UseTNI THEN
+            IF TNImode() THEN
                 mask := "FTPD*.TNI";
             ELSE
                 mask := "FTPD*.INI";
             END (*IF*);
-            found := FirstDirEntry (mask, FALSE, TRUE, D);
+            found := FirstDirEntry (mask, FALSE, FALSE, TRUE, D);
         ELSE
             found := TRUE;
         END (*IF*);
@@ -237,7 +247,7 @@ PROCEDURE LoadValues (hwnd: OS2.HWND);
         WHILE found DO
 
             IF MultiFileMode THEN
-                SetINIFileName (D.name, UseTNI);
+                ChangeINIFilename (D.name);
                 OpenINIFile;
             END (*IF*);
 
@@ -283,16 +293,13 @@ PROCEDURE LoadValues (hwnd: OS2.HWND);
         END (*WHILE*);
 
         IF MultiFileMode THEN
+
             DirSearchDone (D);
 
             (* Restore the original INI file name. *)
 
-            IF UseTNI THEN
-                mask := "FTPD.TNI";
-            ELSE
-                mask := "FTPD.INI";
-            END (*IF*);
-            SetINIFileName (mask, UseTNI);
+            RestoreINIFilename;
+
         END (*IF*);
 
         (* At this point we have collected all usernames in all of our  *)
@@ -606,15 +613,13 @@ PROCEDURE ["SysCall"] DialogueProc(hwnd     : OS2.HWND
 
 (************************************************************************)
 
-PROCEDURE CreatePage (notebook: OS2.HWND;  TNImode: BOOLEAN;
-                                VAR (*OUT*) PageID: CARDINAL): OS2.HWND;
+PROCEDURE CreatePage (notebook: OS2.HWND;  VAR (*OUT*) PageID: CARDINAL): OS2.HWND;
 
     (* Creates the user page and adds it to the notebook. *)
 
     VAR Label: ARRAY [0..31] OF CHAR;
 
     BEGIN
-        UseTNI := TNImode;
         pagehandle := OS2.WinLoadDlg(notebook, notebook,
                        DialogueProc,    (* dialogue procedure *)
                        0,                   (* use resources in EXE *)
@@ -645,7 +650,6 @@ PROCEDURE SetFont (VAR (*IN*) name: CommonSettings.FontName);
 (************************************************************************)
 
 BEGIN
-    UseTNI := FALSE;
     ChangeInProgress := FALSE;
 END UserPage.
 

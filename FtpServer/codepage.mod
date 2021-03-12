@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Support modules for network applications                              *)
-(*  Copyright (C) 2014   Peter Moylan                                     *)
+(*  Copyright (C) 2020   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -27,7 +27,7 @@ IMPLEMENTATION MODULE CodePage;
         (*     Translation between code pages and Unicode       *)
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
-        (*  Last edited:        7 April 2013                    *)
+        (*  Last edited:        25 November 2020                *)
         (*  Status:             OK                              *)
         (*                                                      *)
         (********************************************************)
@@ -116,11 +116,38 @@ CONST
                        00B0H, 2219H, 00B7H, 221AH, 2116H, 00A4H, 25A0H, 00A0H
                        };
 
+    (* Code page 1251 from ftp://ftp.unicode.org/Public/MAPPINGS/VENDORS/MICSFT/WINDOWS/CP1251.TXT *)
+
+    CP1251 = UpperPage{0402H, 0403H, 201AH, 0453H, 201EH, 2026H, 2020H, 2021H,
+                       20ACH, 2030H, 0409H, 2039H, 040AH, 040CH, 040BH, 040FH,
+                       0452H, 2018H, 2019H, 201CH, 201DH, 2022H, 2013H, 2014H,
+                       0020H, 2122H, 0459H, 203AH, 045AH, 045CH, 045BH, 045FH,
+
+                       00A0H, 040EH, 045EH, 0408H, 00A4H, 0490H, 00A6H, 00A7H,
+                       0401H, 00A9H, 0404H, 00ABH, 00ACH, 00ADH, 00AEH, 0407H,
+                       00B0H, 00B1H, 0406H, 0456H, 0491H, 00B5H, 00B6H, 00B7H,
+                       0451H, 2116H, 0454H, 00BBH, 0458H, 0405H, 0455H, 0457H,
+
+                       0410H, 0411H, 0412H, 0413H, 0414H, 0415H, 0416H, 0417H,
+                       0418H, 0419H, 041AH, 041BH, 041CH, 041DH, 041EH, 041FH,
+                       0420H, 0421H, 0422H, 0423H, 0424H, 0425H, 0426H, 0427H,
+                       0428H, 0429H, 042AH, 042BH, 042CH, 042DH, 042EH, 042FH,
+
+                       0430H, 0431H, 0432H, 0433H, 0434H, 0435H, 0436H, 0437H,
+                       0438H, 0439H, 043AH, 043BH, 043CH, 043DH, 043EH, 043FH,
+                       0440H, 0441H, 0442H, 0443H, 0444H, 0445H, 0446H, 0447H,
+                       0448H, 0449H, 044AH, 044BH, 044CH, 044DH, 044EH, 044FH
+                       };
+
 
 VAR
     (* Translation from upper-half character to UTF-8. *)
 
     CodeTable: UpperPage;
+
+    (* Flag to say that tables should be bypassed. *)
+
+    DirectCopy: BOOLEAN;
 
 (********************************************************************************)
 (*                           TRANSLATION TO UTF-8                               *)
@@ -182,6 +209,11 @@ PROCEDURE TranslateToUTF8 (string: ARRAY OF CHAR;
     VAR j, val: CARDINAL;
 
     BEGIN
+        IF DirectCopy THEN
+            Strings.Assign (string, result);
+            RETURN;
+        END (*IF*);
+
         j := 0;  k := 0;
         WHILE (j <= HIGH(string)) AND (k <= HIGH(result)) AND (string[j] <> Nul) DO
             val := UTF(string[j]);  INC(j);
@@ -267,6 +299,11 @@ PROCEDURE ExtASCII (val: CARDINAL): CHAR;
     (* of a table search for each non-ASCII character, simply because such   *)
     (* characters are a minority in the typical filename string.             *)
 
+    (* If I ever feel the need to make this more efficient, the easiest way *)
+    (* to do it would be to have an inverse mapping, sorted by UTF value,   *)
+    (* for the current code page. This would have to be updated each time   *)
+    (* the current code page was changed.                                   *)
+
     BEGIN
         IF val < 128 THEN
             (* 7-bit ASCII, for which Unicode = ASCII. *)
@@ -311,7 +348,7 @@ PROCEDURE TranslateFromUTF8 (string: ARRAY OF CHAR;
 
     BEGIN
         j := 0;  k := 0;
-        validcode := TRUE;
+        validcode := NOT DirectCopy;
         WHILE validcode AND (j <= HIGH(string))
                         AND (k <= HIGH(result)) AND (string[j] <> Nul) DO
 
@@ -382,8 +419,7 @@ PROCEDURE TranslateFromUTF8 (string: ARRAY OF CHAR;
             END (*IF*);
         ELSE
 
-            (* The above translation was aborted because of an invalid  *)
-            (* UTF-8 string, so just copy the input directly.           *)
+            (* The above translation was aborted, so just copy the input directly.*)
 
             Strings.Assign (string, result);
 
@@ -399,28 +435,22 @@ PROCEDURE SetCodePageData (P: CARDINAL);
 
      (* Sets our current code page to page P.  *)
 
-    VAR ch: CHAR;
-
     BEGIN
+        DirectCopy := FALSE;
         IF P = 437 THEN
-            FOR ch := MIN(UpperCodeRange) TO MAX(UpperCodeRange) DO
-                CodeTable[ch] := CP437[ch];
-            END (*FOR*);
+            CodeTable := CP437;
         ELSIF P = 850 THEN
-            FOR ch := MIN(UpperCodeRange) TO MAX(UpperCodeRange) DO
-                CodeTable[ch] := CP850[ch];
-            END (*FOR*);
+            CodeTable := CP850;
         ELSIF P = 866 THEN
-            FOR ch := MIN(UpperCodeRange) TO MAX(UpperCodeRange) DO
-                CodeTable[ch] := CP866[ch];
-            END (*FOR*);
+            CodeTable := CP866;
+        ELSIF P = 1251 THEN
+            CodeTable := CP1251;
         ELSE
-            (* Unsupported code page, set the translation table to be  *)
-            (* the identity transformation.                            *)
+            (* Unsupported code page or UTF8 code page.  In either case *)
+            (* the "translation" is just a direct copy.                 *)
 
-            FOR ch := MIN(UpperCodeRange) TO MAX(UpperCodeRange) DO
-                CodeTable[ch] := ORD(ch);
-            END (*FOR*);
+            DirectCopy := TRUE;
+
         END (*IF*);
 
     END SetCodePageData;

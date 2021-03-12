@@ -1,9 +1,14 @@
+- USEDLL+
+- GENDLL -
+- IMPLIB -
+
 - GENDEBUG +
 - LINENO +
 - GENHISTORY +
 -multithread+
 
 -TRACKTNIUSAGE:-
+-EXCEPTQ:+
 
 -INCL_VIO:+
 -INCL_KBD:+

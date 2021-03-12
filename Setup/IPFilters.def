@@ -6,7 +6,7 @@ DEFINITION MODULE IPFilters;
         (*             Manipulation of IP filter elements               *)
         (*                                                              *)
         (*        Started:        11 September 2008                     *)
-        (*        Last edited:    18 September 2008                     *)
+        (*        Last edited:    21 October 2019                       *)
         (*        Status:         OK                                    *)
         (*                                                              *)
         (****************************************************************)
@@ -39,19 +39,21 @@ PROCEDURE CardinalToDotted (value: CARDINAL;  VAR (*OUT*) text: ARRAY OF CHAR);
 
     (* Converts the value to a string of the form a.b.c.d    *)
 
-PROCEDURE AddrRecordToText (p: ListPtr;  VAR (*OUT*) text: ARRAY OF CHAR);
+PROCEDURE AddrRecordToText (p: ListPtr;  VAR (*OUT*) text: ARRAY OF CHAR;
+                                    InclExcl: BOOLEAN);
 
-    (* Converts p^ to a text string. *)
+    (* Converts p^ to a text string.  If InclExcl = TRUE then we use    *)
+    (* labels include/exclude instead of allow/refuse.                  *)
 
 PROCEDURE StringToIPAddress (text: ARRAY OF CHAR): CARDINAL;
 
     (* Converts an IP address. *)
 
-PROCEDURE LoadIPFilterList (appname: ARRAY OF CHAR): ListPtr;
+PROCEDURE LoadIPFilterList (appname, key: ARRAY OF CHAR): ListPtr;
 
     (* Loads an allow/deny list from the INI file.    *)
 
-PROCEDURE StoreIPFilterList (appname: ARRAY OF CHAR;  head: ListPtr);
+PROCEDURE StoreIPFilterList (appname, key: ARRAY OF CHAR;  head: ListPtr);
 
     (* Stores an allow/deny list to the INI file.  We assume that the   *)
     (* caller already has the INI file open.                            *)

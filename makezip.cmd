@@ -41,8 +41,7 @@ call seticon
 mkdir temp
 cd temp
 mkdir doc
-'copy ..\doc\changes.doc doc'
-'copy ..\doc\ftpserver.ipf doc'
+'copy ..\doc\changes.txt doc'
 mkdir tools
 'copy ..\tools\README tools'
 'copy ..\tools\AddUser.cmd tools'
@@ -66,7 +65,7 @@ mkdir tools
 'copy ..\seticon.cmd'
 'copy ..\gpl.txt'
 'copy ..\file_id.diz'
-'copy ..\doc\ftpserver.inf'
+'copy ..\doc\ftpserver.inf doc'
 'copy ..\ftpd.exe'
 'copy ..\ftpd.map'
 'copy ..\ftpd.sym'
@@ -137,6 +136,8 @@ cd ..
 'cd FtpServer'
 'unzip -q -o src1.zip'
 'del src1.zip /N'
+'mkdir doc'
+'copy ..\..\doc\ftpserver.ipf doc'
 'cd ..'
 
 'mkdir Setup'
@@ -158,6 +159,12 @@ cd ..
 
 /* Remove temporary files. */
 
+cd FtpServer
+cd doc
+'del * /N'
+'cd ..'
+'rmdir doc'
+'cd ..'
 'del FtpServer\* /N'
 'rmdir FtpServer'
 'del Setup\* /N'

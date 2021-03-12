@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Setup for FtpServer                                                   *)
-(*  Copyright (C) 2017   Peter Moylan                                     *)
+(*  Copyright (C) 2020   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -27,23 +27,45 @@ IMPLEMENTATION MODULE OpeningDialogue;
         (*                    Initial dialogue box                      *)
         (*                                                              *)
         (*    Started:        7 October 1999                            *)
-        (*    Last edited:    22 May 2017                               *)
+        (*    Last edited:    14 December 2020                          *)
         (*    Status:         Working                                   *)
         (*                                                              *)
         (****************************************************************)
 
-IMPORT SYSTEM, OS2, OS2RTL, DID, Remote, BigFrame, PMInit;
-
-FROM RINIData IMPORT
-    (* proc *)  SetRemote;
+IMPORT SYSTEM, OS2, OS2RTL, DID, FSUINI, RINIData, Remote, BigFrame, PMInit;
 
 FROM MiscFuncs IMPORT
     (* proc *)  EVAL;
 
 (************************************************************************)
 
-VAR RemoteFlag, UseTNI: BOOLEAN;
+VAR RemoteFlag: BOOLEAN;
+    UseTNI, TNIexplicit: BOOLEAN;
     SwitchData : OS2.SWCNTRL;     (* switch entry data *)
+
+(************************************************************************)
+
+PROCEDURE DecideOnTNImode;
+
+    (* Procedure to set INI mode or TNI mode for the server INI file.   *)
+    (* The decision has already been made, by a higher-level module,    *)
+    (* for Setup.INI/TNI, and that is reflected in the UseTNI flag that *)
+    (* has been supplied to us.  For local configuration, the same INI  *)
+    (* mode will be used.  For remote configuration, the decision will  *)
+    (* depend on remote files, unless the caller has explicitly told us *)
+    (* what the mode should be.                                         *)
+
+    (* This procedure should not be called until the final decision on  *)
+    (* the value of RemoteFlag has been made.                           *)
+
+    BEGIN
+        IF TNIexplicit THEN
+            RINIData.CommitTNIDecision ("FTPD", UseTNI);
+        ELSIF NOT RINIData.ChooseDefaultINI ("FTPD", UseTNI) THEN
+            UseTNI := FALSE;
+        END (*IF*);
+        FSUINI.SetTNIMode (UseTNI);
+    END DecideOnTNImode;
 
 (************************************************************************)
 
@@ -51,7 +73,7 @@ PROCEDURE PostUpdated (semName: ARRAY OF CHAR);
 
     (* Posts on a public event semaphore. *)
 
-    VAR changehev: OS2.HEV;  count: CARDINAL;
+    VAR changehev: OS2.HEV;
 
     BEGIN
         changehev := 0;
@@ -59,13 +81,12 @@ PROCEDURE PostUpdated (semName: ARRAY OF CHAR);
             OS2.DosCreateEventSem (semName, changehev, OS2.DC_SEM_SHARED, FALSE);
         END (*IF*);
         OS2.DosPostEventSem (changehev);
-        OS2.DosResetEventSem (changehev, count);
         OS2.DosCloseEventSem(changehev);
     END PostUpdated;
 
 (************************************************************************)
 
-PROCEDURE ["SysCall"] MainDialogueProc(hwnd     : OS2.HWND
+PROCEDURE ["SysCall"] OpeningDialogueProc(hwnd     : OS2.HWND
                      ;msg      : OS2.ULONG
                      ;mp1, mp2 : OS2.MPARAM): OS2.MRESULT;
 
@@ -88,8 +109,9 @@ PROCEDURE ["SysCall"] MainDialogueProc(hwnd     : OS2.HWND
                      | DID.GoButton:
                           IF NOT RemoteFlag OR Remote.ConnectToServer (hwnd, DID.Status) THEN
                               OS2.WinSetDlgItemText (hwnd, DID.Status, "Loading, please wait");
-                              SetRemote (RemoteFlag);
-                              BigFrame.OpenBigFrame (hwnd, UseTNI);
+                              RINIData.SetRemote (RemoteFlag);
+                              DecideOnTNImode;
+                              BigFrame.OpenBigFrame (hwnd);
                               IF RemoteFlag THEN
                                   EVAL(Remote.PostSemaphore (UpdateSemName));
                                   EVAL(Remote.ExecCommand ('Q'));
@@ -130,29 +152,36 @@ PROCEDURE ["SysCall"] MainDialogueProc(hwnd     : OS2.HWND
 
         RETURN NIL;
 
-    END MainDialogueProc;
+    END OpeningDialogueProc;
 
-(**************************************************************************)
+(************************************************************************)
 
-PROCEDURE CreateMainDialogue (LocalRemote: CARDINAL;  TNImode: BOOLEAN);
+PROCEDURE CreateOpeningDialogue (LocalRemote: CARDINAL;  TNImode, explicit: BOOLEAN);
 
-    (* Creates the main dialogue box.  The meaning of LocalRemote is:    *)
-    (*         0   let user specify local or remote                      *)
-    (*         1   force local setup                                     *)
-    (*         2   force remote setup                                    *)
-    (*         3   force whichever was used last time                    *)
+    (* Creates the main dialogue box.  The meaning of LocalRemote is:   *)
+    (*         0   let user specify local or remote                     *)
+    (*         1   force local setup                                    *)
+    (*         2   force remote setup                                   *)
+    (*         3   force whichever was used last time                   *)
+
+    (* TNImode specifies the INI/TNI mode that has already been chosen  *)
+    (* for Setup.  It is this module's starting point for choosing      *)
+    (* whether to use FTPD.INI or FTPD.TNI.  The variable explicit is   *)
+    (* TRUE iff the Setup program has been called with a -I or -T       *)
+    (* parameter.                                                       *)
 
     VAR hwnd, SetupButtonWindow: OS2.HWND;
         pid: OS2.PID;  tid: OS2.TID;
 
     BEGIN
-        UseTNI := TNImode;
+        UseTNI := TNImode;  TNIexplicit := explicit;
+
         hwnd := OS2.WinLoadDlg(OS2.HWND_DESKTOP,    (* parent *)
-                       OS2.HWND_DESKTOP,   (* owner *)
-                       MainDialogueProc,   (* dialogue procedure *)
-                       0,                  (* use resources in EXE *)
-                       DID.FirstWindow,    (* dialogue ID *)
-                       NIL);               (* creation parameters *)
+                       OS2.HWND_DESKTOP,    (* owner *)
+                       OpeningDialogueProc, (* dialogue procedure *)
+                       0,                   (* use resources in EXE *)
+                       DID.FirstWindow,     (* dialogue ID *)
+                       NIL);                (* creation parameters *)
 
         (* Put us on the visible task list. *)
 
@@ -171,7 +200,7 @@ PROCEDURE CreateMainDialogue (LocalRemote: CARDINAL;  TNImode: BOOLEAN);
         OS2.WinCreateSwitchEntry (PMInit.OurHab(), SwitchData);
 
         RemoteFlag := Remote.InitialSetup (NIL, "FtpServer",
-                                 "Setup", "C:\Servers\FtpServer", UseTNI);
+                                 "Setup", "C:\Servers\FtpServer", TNImode);
         Remote.SetInitialWindowPosition (hwnd, "Opening");
 
         (* Set the local/remote check buttons correctly. *)
@@ -210,11 +239,9 @@ PROCEDURE CreateMainDialogue (LocalRemote: CARDINAL;  TNImode: BOOLEAN);
         Remote.StoreWindowPosition (hwnd, "Opening", TRUE);
         OS2.WinDestroyWindow (hwnd);
 
-    END CreateMainDialogue;
+    END CreateOpeningDialogue;
 
 (**************************************************************************)
 
-BEGIN
-    UseTNI := FALSE;
 END OpeningDialogue.
 

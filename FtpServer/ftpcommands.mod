@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  FtpServer FTP daemon                                                  *)
-(*  Copyright (C) 2018   Peter Moylan                                     *)
+(*  Copyright (C) 2019   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE FtpCommands;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            23 August 1997                  *)
-        (*  Last edited:        15 December 2018                *)
+        (*  Last edited:        17 Octomber 2019                *)
         (*  Status:             All commands implemented        *)
         (*                                                      *)
         (********************************************************)
@@ -97,7 +97,7 @@ FROM Internet IMPORT
     (* type *)  InternetSocketAddress;
 
 FROM Inet2Misc IMPORT
-    (* proc *)  Synch;
+    (* proc *)  Synch, Swap2;
 
 FROM MiscFuncs IMPORT
     (* proc *)  EVAL, StringMatch, GetNum, ConvertCard, ToLower,
@@ -983,7 +983,7 @@ PROCEDURE EPSV (session: Session;  VAR (*IN*) arg: ARRAY OF CHAR);
             IF EnterPassiveMode (session^.user, myaddr) THEN
                 msg := "229 Entering passive mode (|||";
                 pos := Strings.Length (msg);
-                ConvertCard (myaddr.in_addr.port, msg, pos);
+                ConvertCard (Swap2(myaddr.in_addr.port), msg, pos);
                 msg[pos] := '|';  INC(pos);
                 msg[pos] := ')';  INC(pos);
                 msg[pos] := Nul;  INC(pos);

@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  FtpServer FTP daemon                                                  *)
-(*  Copyright (C) 2018   Peter Moylan                                     *)
+(*  Copyright (C) 2020   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE FtpTransfers;
         (*                                                      *)
         (*  Programmer:         P. Moylan                       *)
         (*  Started:            24 August 1997                  *)
-        (*  Last edited:        13 December 2018                *)
+        (*  Last edited:        26 November 2020                *)
         (*  Status:             OK                              *)
         (*                                                      *)
         (********************************************************)
@@ -85,6 +85,9 @@ FROM CodePage IMPORT
 
 FROM NameLookup IMPORT
     (* proc *)  StartNameLookup, CancelNameLookup, GetName;
+
+FROM IPFilter IMPORT
+    (* proc *)  AddressIsLocal;
 
 FROM FDUsers IMPORT
     (* type *)  User, UserCategory, FName, ListingOption, ListingOptions,
@@ -274,8 +277,6 @@ VAR MaxUsers: CARDINAL;
     FWParams: RECORD
                   access: Lock;
                   BehindFirewall: BOOLEAN;
-                  LocalIPAddrMin: CARDINAL;               (* network byte order *)
-                  LocalIPAddrMax: CARDINAL;               (* network byte order *)
                   FirewallIPAddr: CARDINAL;               (* network byte order *)
               END (*RECORD*);
 
@@ -421,7 +422,7 @@ PROCEDURE KillDirectory (dirname: FileNameString);
     BEGIN
         mask := dirname;
         Strings.Append ('\*', mask);
-        found := FirstDirEntry (mask, FALSE, TRUE, D);
+        found := FirstDirEntry (mask, TRUE, FALSE, TRUE, D);
         WHILE found DO
             mask := dirname;
             Strings.Append ('\', mask);
@@ -453,7 +454,7 @@ PROCEDURE DirectoryEmpty (dirname: FileNameString): BOOLEAN;
         NoFiles := TRUE;
         mask := dirname;
         Strings.Append ('\*', mask);
-        found := FirstDirEntry (mask, FALSE, TRUE, D);
+        found := FirstDirEntry (mask, TRUE, FALSE, TRUE, D);
         WHILE found AND NoFiles DO
             mask := dirname;
             Strings.Append ('\', mask);
@@ -685,15 +686,27 @@ PROCEDURE SetFreeSpaceThreshold (kilobytes: CARDINAL);
 
 (********************************************************************************)
 
+PROCEDURE IsLocal (addr: CARDINAL): BOOLEAN;
+
+    (* Returns TRUE iff addr has been designated as a local address.  Relevant  *)
+    (* only if the "behind firewall" rules are being used.  Parameter addr is   *)
+    (* is in network byte order, i.e. BigEndian.                                *)
+
+    CONST LoopbackAddress = 1 + 256*(0 + 256*(0 + 256*(127)));      (* 127.0.0.1 *)
+
+    BEGIN
+        RETURN (addr = LoopbackAddress) OR AddressIsLocal(addr);
+    END IsLocal;
+
+(********************************************************************************)
+
 PROCEDURE CreateSession (S: Socket;  UserNumber: CARDINAL;  LogID: TransactionLogID;
                                KeepAlive: Semaphore): ClientFileInfo;
 
     (* Creates a new session state record.  Some of the user information is   *)
     (* still missing, but will be filled in when FindUser is called.          *)
 
-    CONST LoopbackAddress = 1 + 256*(0 + 256*(0 + 256*(127)));      (* 127.0.0.1 *)
-
-    VAR result: ClientFileInfo;  peer: SockAddr;  size, temp: CARDINAL;
+    VAR result: ClientFileInfo;  peer: SockAddr;  size: CARDINAL;
 
     BEGIN
         NEW (result);
@@ -734,7 +747,6 @@ PROCEDURE CreateSession (S: Socket;  UserNumber: CARDINAL;  LogID: TransactionLo
                 ELSE
                     ClientIP := peer.in_addr.addr;
                 END (*IF*);
-                temp := Swap4(ClientIP);
                 StartNameLookup (ClientIP);
                 Strings.Assign ("?", UserName);
                 entrycount := 0;
@@ -745,13 +757,8 @@ PROCEDURE CreateSession (S: Socket;  UserNumber: CARDINAL;  LogID: TransactionLo
                 host := Log.ClientIP;  port := 0;
                 socket := NotASocket;
             END (*WITH*);
-            WITH FWParams DO
-                Obtain (access);
-                AllowForFirewall := BehindFirewall AND (temp <> LoopbackAddress)
-                                    AND ((temp < Swap4(LocalIPAddrMin))
-                                         OR (temp > Swap4(LocalIPAddrMax)));
-                Release (access);
-            END (*WITH*);
+            AllowForFirewall := FWParams.BehindFirewall
+                                    AND NOT IsLocal(Log.ClientIP);
         END (*WITH*);
         RETURN result;
     END CreateSession;
@@ -2717,21 +2724,17 @@ PROCEDURE SetPassivePortRange (limit: BOOLEAN;  portmin, portmax: CARD16);
 
 (************************************************************************)
 
-PROCEDURE SetBehindFirewall (enable: BOOLEAN;
-                            MinLocalAddr, MaxLocalAddr, IPAddr: CARDINAL);
+PROCEDURE SetBehindFirewall (enable: BOOLEAN;  IPAddr: CARDINAL);
 
     (* If enable is TRUE, then IPAddr is the address that we report in  *)
-    (* the PASV response.  Exception: if the client address is in the   *)
-    (* range MinLocalAddr to MaxLocalAddr, inclusive, the "behind       *)
-    (* firewall" rules are not applied.  The three numeric values are   *)
+    (* the PASV response.  Exception: the "behind firewall" rules are   *)
+    (* not applied if the client address is a local address.  IPAddr is *)
     (* in network byte order.                                           *)
-    (* If enable is FALSE, the numeric parameters have no effect.       *)
+    (* If enable is FALSE, the IPAddr parameter has no effect.          *)
 
     BEGIN
         WITH FWParams DO
             Obtain (access);
-            LocalIPAddrMin := MinLocalAddr;
-            LocalIPAddrMax := MaxLocalAddr;
             BehindFirewall := enable;
             IF BehindFirewall THEN
                 FirewallIPAddr := IPAddr;
@@ -2758,8 +2761,6 @@ BEGIN
         CreateLock (access);
         BehindFirewall := FALSE;
         FirewallIPAddr := 0;
-        LocalIPAddrMin := 0;
-        LocalIPAddrMax := 0;
     END (*WITH*);
 END FtpTransfers.
 

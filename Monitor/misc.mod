@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Monitor for FtpServer                                                 *)
-(*  Copyright (C) 2018   Peter Moylan                                     *)
+(*  Copyright (C) 2020   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,8 +28,10 @@ IMPLEMENTATION MODULE Misc;
         (*                 Miscellaneous procedures             *)
         (*                                                      *)
         (*    Started:        29 March 2000                     *)
-        (*    Last edited:    9 December 2018                   *)
+        (*    Last edited:    20 November 2020                  *)
         (*    Status:         adding some 64-bit functions      *)
+        (*                                                      *)
+        (*      Most of this module appears to be obsolete      *)
         (*                                                      *)
         (********************************************************)
 
@@ -66,6 +68,7 @@ VAR
 
 (************************************************************************)
 
+(*
 PROCEDURE SwapIt (VAR (*INOUT*) arg: ARRAY OF LOC);
 
     (* Reverses the byte order of its argument. *)
@@ -78,9 +81,10 @@ PROCEDURE SwapIt (VAR (*INOUT*) arg: ARRAY OF LOC);
             temp := arg[j];  arg[j] := arg[top-j];  arg[top-j] := temp;
         END (*FOR*);
     END SwapIt;
-
+*)
 (************************************************************************)
 
+(*
 PROCEDURE Swap2 (val: CARD16): CARD16;
 
     (* Returns the argument value in byte-reversed order.  This is needed       *)
@@ -94,9 +98,10 @@ PROCEDURE Swap2 (val: CARD16): CARD16;
         SwapIt (temp);
         RETURN temp;
     END Swap2;
-
+*)
 (************************************************************************)
 
+(*
 PROCEDURE Swap4 (val: CARD32): CARD32;
 
     (* Returns the argument value in byte-reversed order.  This is needed       *)
@@ -110,9 +115,10 @@ PROCEDURE Swap4 (val: CARD32): CARD32;
         SwapIt (temp);
         RETURN temp;
     END Swap4;
-
+*)
 (************************************************************************)
 
+(*
 PROCEDURE EVAL (f: ARRAY OF LOC);
 
     (* A do-nothing procedure - we use it for evaluating a function and *)
@@ -120,9 +126,11 @@ PROCEDURE EVAL (f: ARRAY OF LOC);
 
     BEGIN
     END EVAL;
+*)
 
 (********************************************************************************)
 
+(*
 PROCEDURE NameIsNumeric (VAR (*INOUT*) name: ARRAY OF CHAR): BOOLEAN;
 
     (* Returns TRUE iff name has the form N.N.N.N or [N.N.N.N] where each N is  *)
@@ -183,9 +191,11 @@ PROCEDURE NameIsNumeric (VAR (*INOUT*) name: ARRAY OF CHAR): BOOLEAN;
         END (*IF*);
         RETURN result;
     END NameIsNumeric;
+*)
 
 (********************************************************************************)
 
+(*
 PROCEDURE ConvertCard (number: CARDINAL;  VAR (*OUT*) result: ARRAY OF CHAR;
                                           VAR (*INOUT*) pos: CARDINAL);
 
@@ -202,9 +212,11 @@ PROCEDURE ConvertCard (number: CARDINAL;  VAR (*OUT*) result: ARRAY OF CHAR;
             result[pos] := buffer[j];  INC(pos);  INC(j);
         END (*WHILE*);
     END ConvertCard;
+*)
 
 (********************************************************************************)
 
+(*
 PROCEDURE Card64ToString (number: CARD64;  VAR (*OUT*) result: ARRAY OF CHAR;
                                            VAR (*INOUT*) pos: CARDINAL);
 
@@ -222,9 +234,11 @@ PROCEDURE Card64ToString (number: CARD64;  VAR (*OUT*) result: ARRAY OF CHAR;
         result[pos] := CHR(ORD('0') + R);
         INC (pos);
     END Card64ToString;
+*)
 
 (********************************************************************************)
 
+(*
 PROCEDURE IPToString (IP: ARRAY OF LOC;  EncloseInBrackets: BOOLEAN;
                                 VAR (*OUT*) result: ARRAY OF CHAR);
 
@@ -252,6 +266,7 @@ PROCEDURE IPToString (IP: ARRAY OF LOC;  EncloseInBrackets: BOOLEAN;
             result[position] := Nul;
         END (*IF*);
     END IPToString;
+*)
 
 (********************************************************************************)
 
@@ -317,6 +332,7 @@ PROCEDURE StringToCard64 (VAR (*IN*) string: ARRAY OF CHAR;
 
 (********************************************************************************)
 
+(*
 PROCEDURE StringToCard (VAR (*IN*) string: ARRAY OF CHAR;
                                           VAR (*INOUT*) pos: CARDINAL): CARDINAL;
 
@@ -342,9 +358,11 @@ PROCEDURE StringToCard (VAR (*IN*) string: ARRAY OF CHAR;
         END (*WHILE*);
         RETURN value;
     END StringToCard;
+*)
 
 (********************************************************************************)
 
+(*
 PROCEDURE StringToShortCard (VAR (*IN*) string: ARRAY OF CHAR;
                                       VAR (*INOUT*) pos: CARDINAL): CARD8;
 
@@ -361,9 +379,11 @@ PROCEDURE StringToShortCard (VAR (*IN*) string: ARRAY OF CHAR;
         END (*IF*);
         RETURN result;
     END StringToShortCard;
+*)
 
 (********************************************************************************)
 
+(*
 PROCEDURE StringToIPAddress (VAR (*IN*) name: ARRAY OF CHAR;
                                           VAR (*INOUT*) pos: CARDINAL): CARDINAL;
 
@@ -402,6 +422,7 @@ PROCEDURE StringToIPAddress (VAR (*IN*) name: ARRAY OF CHAR;
         END (*IF*);
         RETURN result;
     END StringToIPAddress;
+*)
 
 (********************************************************************************)
 

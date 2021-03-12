@@ -27,7 +27,7 @@ IMPLEMENTATION MODULE About;
         (*                     The 'about' dialogue                     *)
         (*                                                              *)
         (*    Started:        25 May 2000                               *)
-        (*    Last edited:    19 November 2009                          *)
+        (*    Last edited:    20 November 2020                          *)
         (*    Status:         OK                                        *)
         (*                                                              *)
         (****************************************************************)
@@ -47,7 +47,7 @@ PROCEDURE Create (owner: OS2.HWND);
 
     (* Creates the dialogue box. *)
 
-    VAR hwnd: OS2.HWND;  TNImode: BOOLEAN;
+    VAR hwnd: OS2.HWND;
         INIFileName: ARRAY [0..511] OF CHAR;
 
     BEGIN
@@ -57,12 +57,12 @@ PROCEDURE Create (owner: OS2.HWND);
                        DID.AboutDialogue,                (* dialogue ID *)
                        NIL);                 (* creation parameters *)
 
-        GetINIFileName (INIFileName, TNImode);
-        SetInitialWindowPosition (hwnd, INIFileName, "About", TNImode);
+        GetINIFileName (INIFileName);
+        SetInitialWindowPosition (hwnd, INIFileName, "About");
         OS2.WinShowWindow (hwnd, TRUE);
 
         OS2.WinProcessDlg(hwnd);
-        StoreWindowPosition (hwnd, INIFileName, "About", TNImode);
+        StoreWindowPosition (hwnd, INIFileName, "About");
         OS2.WinDestroyWindow (hwnd);
     END Create;
 

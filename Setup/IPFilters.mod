@@ -1,7 +1,7 @@
 (**************************************************************************)
 (*                                                                        *)
 (*  Setup for FtpServer                                                   *)
-(*  Copyright (C) 2017   Peter Moylan                                     *)
+(*  Copyright (C) 2019   Peter Moylan                                     *)
 (*                                                                        *)
 (*  This program is free software: you can redistribute it and/or modify  *)
 (*  it under the terms of the GNU General Public License as published by  *)
@@ -28,7 +28,7 @@ IMPLEMENTATION MODULE IPFilters;
         (*             Manipulation of IP filter elements               *)
         (*                                                              *)
         (*        Started:        11 September 2008                     *)
-        (*        Last edited:    22 May 2017                           *)
+        (*        Last edited:    21 October 2019                       *)
         (*        Status:         Updated to more record types          *)
         (*                                                              *)
         (****************************************************************)
@@ -100,16 +100,22 @@ PROCEDURE CardinalToDotted (value: CARDINAL;  VAR (*OUT*) text: ARRAY OF CHAR);
 
 (************************************************************************)
 
-PROCEDURE AddrRecordToText (p: ListPtr;  VAR (*OUT*) text: ARRAY OF CHAR);
+PROCEDURE AddrRecordToText (p: ListPtr;  VAR (*OUT*) text: ARRAY OF CHAR;
+                                    InclExcl: BOOLEAN);
 
-    (* Converts p^ to a text string. *)
+    (* Converts p^ to a text string.  If InclExcl = TRUE then we use    *)
+    (* labels include/exclude instead of allow/refuse.                  *)
 
     CONST MaskPos = 25;
 
     VAR place, j: CARDINAL;
 
     BEGIN
-        IF p^.allow THEN Strings.Assign ("Allow   ", text)
+        IF InclExcl THEN
+            IF p^.allow THEN Strings.Assign ("Include   ", text)
+            ELSE Strings.Assign ("Exclude  ", text)
+            END (*IF*);
+        ELSIF p^.allow THEN Strings.Assign ("Allow   ", text)
         ELSE Strings.Assign ("Refuse  ", text)
         END (*IF*);
         IF p^.type = 0 THEN
@@ -229,7 +235,7 @@ PROCEDURE StringToIPAddress (text: ARRAY OF CHAR): CARDINAL;
 (*          GETTING/PUTTING IP ADDRESS CONTROLS FROM INI FILE           *)
 (************************************************************************)
 
-PROCEDURE LoadIPFilterList (appname: ARRAY OF CHAR): ListPtr;
+PROCEDURE LoadIPFilterList (appname, key: ARRAY OF CHAR): ListPtr;
 
     (* Loads an allow/deny list from the INI file.    *)
 
@@ -275,7 +281,7 @@ PROCEDURE LoadIPFilterList (appname: ARRAY OF CHAR): ListPtr;
             OpenINIForUser (appname);
         END (*IF*);
         ListHead := NIL;
-        IF NOT ItemSize (appname, "IPfilter", size) THEN
+        IF NOT ItemSize (appname, key, size) THEN
             size := 2;
         END (*IF*);
 
@@ -284,7 +290,7 @@ PROCEDURE LoadIPFilterList (appname: ARRAY OF CHAR): ListPtr;
                 size := 2;
             END (*IF*);
             ALLOCATE (bufptr, size);
-            IF NOT INIFetchBinary (appname, "IPfilter", bufptr^, size) THEN
+            IF NOT INIFetchBinary (appname, key, bufptr^, size) THEN
                 bufptr^[0] := 1;  bufptr^[1] := 0;
             END (*IF*);
             j := 0;  current := NIL;
@@ -351,7 +357,7 @@ PROCEDURE LoadIPFilterList (appname: ARRAY OF CHAR): ListPtr;
 
 (************************************************************************)
 
-PROCEDURE StoreIPFilterList (appname: ARRAY OF CHAR;  head: ListPtr);
+PROCEDURE StoreIPFilterList (appname, key: ARRAY OF CHAR;  head: ListPtr);
 
     (* Stores an allow/deny list to the INI file.  We assume that the   *)
     (* caller already has the INI file open.                            *)
@@ -396,7 +402,7 @@ PROCEDURE StoreIPFilterList (appname: ARRAY OF CHAR;  head: ListPtr);
             END (*IF*);
             current := current^.next;
         END (*WHILE*);
-        INIPutBinary (appname, "IPfilter", bufptr^, size);
+        INIPutBinary (appname, key, bufptr^, size);
         IF bufptr <> NIL THEN
             DEALLOCATE (bufptr, size);
         END (*IF*);
